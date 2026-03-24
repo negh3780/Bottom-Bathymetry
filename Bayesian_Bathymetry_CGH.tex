@@ -1,0 +1,174 @@
+\documentclass[18pt]{article}
+
+\usepackage[margin=.75in]{geometry}
+
+
+\title{A Bayesian Framework for Bathymetry Estimation from Surface Measurements of a Shallow Fluid}
+\author{Patricio Clark Di Leoni, Nathan Glatt-Holtz\\
+  \scriptsize{emails: negh@iu.edu, pclarkdileoni@udesa.edu.ar}}
+
+%\date{}
+
+\usepackage{amsfonts, amssymb, amsmath, amsthm, multicol}
+\usepackage[colorlinks=true, pdfstartview=FitV, linkcolor=blue,
+            citecolor=blue, urlcolor=blue, bookmarksdepth=3]{hyperref}
+\usepackage[usenames]{color}
+\definecolor{Red}{rgb}{0.7,0,0.1}
+\definecolor{Green}{rgb}{0,0.7,0}
+\usepackage{accents}
+\usepackage{comment}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{parcolumns}
+\usepackage{subcaption}
+\usepackage{textcomp}
+\usepackage{mathrsfs}
+\usepackage{mathtools}
+\usepackage{dsfont}
+\usepackage{nccmath}
+\usepackage{enumerate}
+\usepackage[]{mdframed} \usepackage{cjhebrew}
+\usepackage[capitalize,nameinlink,noabbrev]{cleveref}
+
+\providecommand*\showkeyslabelformat[1]{{\normalfont \tiny#1}}
+\usepackage[notref,notcite,color]{showkeys}
+\definecolor{labelkey}{rgb}{0,0,1}
+
+\pagestyle{myheadings}
+\numberwithin{equation}{subsection}
+
+%%%% MACROS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newtheorem{Thm}{Theorem}[section]
+\newtheorem{Lem}[Thm]{Lemma}
+\newtheorem{Prop}[Thm]{Proposition}
+\newtheorem{Cor}[Thm]{Corollary}
+\newtheorem{Ex}[Thm]{Example}
+\newtheorem{Def}[Thm]{Definition}
+\newtheorem{Rmk}[Thm]{Remark}
+\newtheorem{Conj}[Thm]{Conjecture}
+\newtheorem{Hypo}[Thm]{Hypothesis}
+
+\newtheorem{Not}{Notation}[section]
+\newtheorem*{LemNoNum}{Lemma}
+\newtheorem*{Thm*}{Theorem}
+
+%Internal Editing
+\newcommand{\alert}[1]{\textcolor{red}{#1}}
+
+\newcommand{\RR}{\mathbb{R}}
+\newcommand{\indFn}{1 \! \! 1}
+\newcommand{\Prb}{\mathbb{P}}
+\newcommand{\EE}{\mathbb{E}}
+
+\newcommand{\beps}{\boldsymbol{\epsilon}}
+
+
+
+
+%%%%%%
+
+\begin{document}
+  \markboth{(DRAFT COPY-- Please do not distribute)}
+{(DRAFT COPY-- Please do not distribute)}
+
+\maketitle
+
+\begin{abstract}
+\end{abstract}
+
+{\noindent \small {\it \bf Keywords:} \\
+  {\it \bf MSC2020:}}
+
+\newpage
+
+%\begin{footnotesize}
+\setcounter{tocdepth}{2}
+\tableofcontents
+%\end{footnotesize}
+
+
+
+
+\newpage
+
+%---------------------------------------------------------
+% Introduction
+%---------------------------------------------------------
+
+\section{Introduction}\label{sec:intro}
+
+
+We are interested in the estimation of the Bathymetry of shallow water flow from error corrupted surface wave height measurements. 
+
+We would be treating the problem of resolving the Bayesian posterior for the bottom boundary given data points $Y= (y_1, …, y_n)$ as 
+
+$\mu(d h_b) \propto \exp( -1/2 | \Sigma^{1/2} (Y - H(h_b)) |^2)) \mu_0(dh_b)$
+
+Here we are supposing that 
+
+$y_i = h(t_i, x_i, h_b) + \epsilon_i$
+
+where $\beps =  (\epsilon_1,\ldots, \epsilon_n) \sim N(0,\Sigma), h(\cdot, h_b)$ is the solution for the height of shallow water with
+$H(h_b) = (h(t_1, x_1, h_b) , … , h(t_1, x_1, h_b))$.  $\mu_0$ is the prior which we will take to be a Gaussian field with mean $m_b$
+and covariance $C$.    
+
+The modeling questions are:
+1) what we should take $\epsilon$ the observational uncertainties? One might expect correlations between the measurement error for nearby measurement in space time but perhaps I’m being too fancy galaxy brained here.
+2) What is the the mean M and covariance structure of the prior.
+
+\section*{Acknowledgements}
+
+Our efforts are supported under the grants  DMS-2108790
+(NEGH). 
+
+%\begin{footnotesize}
+%\addtocontents{toc}{\protect\setcounter{tocdepth}{1}}
+%\addcontentsline{toc}{section}{References}
+\bibliographystyle{alpha}
+\bibliography{otrefs}
+%\end{footnotesize}
+
+
+\newpage
+
+
+
+
+
+
+
+
+
+\begin{multicols}{2}
+
+
+
+  
+\noindent
+Nathan E. Glatt-Holtz\\ {\footnotesize
+Department of Statistics and Department of Mathematics\\
+Indiana University, Bloomington\\
+Web: \url{https://negh.pages.iu.edu}\\
+Email: \url{negh@iu.edu}} \\[.2cm]
+\columnbreak
+
+\noindent
+Andrew Warren\\
+{\footnotesize
+University of British Columbia\
+Department of Mathematics\\
+Web: \url{https://andrew-warren.github.io}\\
+Email: \url{awarren@math.ubc.ca}}
+\end{multicols}
+
+
+
+
+
+
+
+
+
+\end{document}
