@@ -104,11 +104,11 @@
 We are interested in the estimation of the Bathymetry of shallow water flow from error corrupted surface wave height measurements. 
 The equations of motion are as follows:
 \begin{align}
-    &h_t + (hu)_x + (hv)_y = 0
+    &h_t + (hu)_x + (hv)_y = 0,
     \label{eq:sw:h}\\
-   &(hu)_t + \bigl(hu^2 + \tfrac{1}{2}gh^2\bigr)_{\!x} + (huv)_y = -ghb_x
+   &(hu)_t + \bigl(hu^2 + \tfrac{1}{2}gh^2\bigr)_{\!x} + (huv)_y = -ghb_x,
     \label{eq:sw:u}\\
-   &(hv)_t + (huv)_x + \bigl(hv^2 + \tfrac{1}{2}gh^2\bigr)_{\!y} = -ghb_y
+   &(hv)_t + (huv)_x + \bigl(hv^2 + \tfrac{1}{2}gh^2\bigr)_{\!y} = -ghb_y,
    \label{eq:sw:v}
 \end{align}
 where $h$ is the water column height, $(u,v)$ is the horizontal velocity and $g$ is the 
@@ -126,11 +126,10 @@ of equations.}
 
 We will measure the surface elevation $\eta$ that is
 \begin{align}
-	\eta(t,x,y) :=  h(x,y,t)+b(x,y).
+	\eta(t,x,y) :=  h(x,y,t)+b(x,y),
 \end{align}
-sparsely and with corrupting noise in our observations.  More specifically our model for a set of observation 
-$\bfY= (y_1, …, y_n)$ is 
-as follows
+sparsely and with corrupting noise in our observations.  More specifically our model for a set of wave height observations
+$\bfY= (y_1, …, y_n)$ are 
 \begin{align}
 \label{eq:obs:proceedure}
 y_i = \eta(t_i, x_i, y_i; b) + \epsilon_i
@@ -154,24 +153,36 @@ amounts to computing the Maximum Likelihood estimator for the measurement model 
 Here we would like to treat the problem of formulating, resolving and analyzin the Bayesian posterior 
 for the bottom boundary given data points $\bfY= (y_1, …, y_n)$ as 
 \begin{align}
+	\label{eq:bayes:bath}
 \mu(d b) \propto \exp\left( -\frac{1}{2} | \Sigma^{1/2} (\bfY - H(b)) |^2\right) \mu_0(db),
 \end{align}
-where 
+where $H$ is the `forward-map' defined as
 \begin{align}
+	\label{eq:forward:map}
 	H(b) = (\eta(t_1, x_1, y_n; b), \ldots,  \eta(t_n, x_n, y_n; b)),
 \end{align}
 where $\mu_0$ is the prior (probability) distribution on the unknown Bathymetry $b$.
-Here we are supposing that 
+Thus, in order to specify the estimation and uncertainty quantification problem around \eqref{eq:bayes:bath},
+we need specify, in addition to all of the details of the map $H$, the observation noise covariance $\Sigma$
+and the prior distribution $\mu_0$ on $b$.
 
+Our goal will be to
+\begin{itemize}
+\item[(i)]  Lay down a physically sound, methodically precise rational for the specification of the elements defining 
+\eqref{eq:bayes:bath}.
+\item[(ii)] Systematically resolve \eqref{eq:bayes:bath} to obtain not just point estimates of $b$ but a complete
+uncertainty quantification for this estimation problem.  This will include resolution of credible sets, posterior covariances,
+`push forwards' to other relevant observable quantities, sensitivity of the posterior to data and other model (hyper)parameters
+\item[(iii)] Place  
+\end{itemize}
 
-
-where $\beps =  (\epsilon_1,\ldots, \epsilon_n) \sim N(0,\Sigma), h(\cdot, h_b)$ is the solution for the height of shallow water with
-$H(h_b) = (h(t_1, x_1, h_b) , … , h(t_1, x_1, h_b))$.  $\mu_0$ is the prior which we will take to be a Gaussian field with mean $m_b$
-and covariance $C$.    
-
-The modeling questions are:
-1) what we should take $\epsilon$ the observational uncertainties? One might expect correlations between the measurement error for nearby measurement in space time but perhaps I’m being too fancy galaxy brained here.
-2) What is the the mean M and covariance structure of the prior.
+%where $\beps =  (\epsilon_1,\ldots, \epsilon_n) \sim N(0,\Sigma), h(\cdot, h_b)$ is the solution for the height of shallow water with
+%$H(h_b) = (h(t_1, x_1, h_b) , … , h(t_1, x_1, h_b))$.  $\mu_0$ is the prior which we will take to be a Gaussian field with mean $m_b$
+%and covariance $C$.    
+%
+%The modeling questions are:
+%1) what we should take $\epsilon$ the observational uncertainties? One might expect correlations between the measurement error for nearby measurement in space time but perhaps I’m being too fancy galaxy brained here.
+%2) What is the the mean M and covariance structure of the prior.
 
 
 \section{Formulating the (Gaussian) Prior}
