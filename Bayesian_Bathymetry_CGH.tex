@@ -117,7 +117,8 @@ initial conditions
 \begin{align}
 	h(0,x,y) = h_0(x,y), \quad u(0,x,y) = u_0(x,y), \quad v(0,x,y) = v_0(x,y),
 \end{align}
-and boundary conditions.\footnote{The fluid domain $D$ of definition needs to be defined and in general $D$ is not fixed. Even if
+and boundary conditions.  Regarding the spatial domain $D$ on which \eqref{eq:sw:h}--\eqref{eq:sw:v}  and associated boundary 
+conditions a pragmatic starting point would be to consider a periodic box of length $[-L,L]$ for some $L \gg 1$.\footnote{In any case the fluid domain $D$ of definition needs to be defined and in general $D$ is not fixed. Even if
 we imposed e.g. periodic boundary conditions the fluid motion here is hyperbolic and can form
 shocks in finite time.   At least from an analysis point of view we may wish to 
 impose further conditions (small data? viscous dissipation?) to obtain a more mathematically (and numerically?) tractable set 
@@ -137,17 +138,29 @@ y_i = \eta(t_i, x_i, y_i; b) + \epsilon_i
 where $((t_1, x_1, y_1),\ldots, (t_n, x_n, y_n))$ are the observation locations and $\beps = (\epsilon_1, \ldots, \epsilon_n)$ is an (additive) error or noise
 corruption in the measurement of $(\eta(t_1, x_1, y_n; b), \ldots,  \eta(t_n, x_n, y_n; b))$.\footnote{More generally we can just as well consider $y_i = \Obs_j(\eta(b)) + \epsilon_i$ where the $\Obs_j$'s are observation
 operators.  These $\Obs_j$ could be spatial temporal averages of $\eta$.  Of course the special case of spatial-temporal point observations is given by $\Obs_j(\eta) = \eta(t_j, x_j, y_j)$.}
-Suppose that the $\beps \sim N(0, \Sigma)$, this includes the possibility of correlations in the observation noise, we have a the likelihood of $b$
 
-
-We would be treating the problem of resolving the Bayesian posterior for the bottom boundary given data points $\bfY= (y_1, …, y_n)$ as 
+Suppose that the $\beps \sim N(0, \Sigma)$, that is a Gaussian mean free error, with Covariance $\Sigma$.  Note that this $\Sigma$ includes the possibility of correlations in the observation noise.  
+In this situation we then have a  likelihood of $b$ of the form
 \begin{align}
-\mu(d b) \propto \exp\left( -\frac{1}{2} | \Sigma^{1/2} (Y - H(b)) |^2)\right) \mu_0(db),
+	\mathcal{L}(b; \bfY) = \frac{1}{\sqrt{ (2\pi)^n \det(\Sigma)}} \exp\left( -\frac{1}{2} | \Sigma^{1/2} (\bfY - H(b)) |^2\right).
+\end{align}
+Thus, in statistical language, optimizing the quadratic loss function
+\begin{align}
+ \ell(b, \bfY) = | \Sigma^{1/2} (\bfY - H(b)) |^2
+\end{align}
+amounts to computing the Maximum Likelihood estimator for the measurement model \eqref{eq:obs:proceedure}.
+
+
+Here we would like to treat the problem of formulating, resolving and analyzin the Bayesian posterior 
+for the bottom boundary given data points $\bfY= (y_1, …, y_n)$ as 
+\begin{align}
+\mu(d b) \propto \exp\left( -\frac{1}{2} | \Sigma^{1/2} (\bfY - H(b)) |^2\right) \mu_0(db),
 \end{align}
 where 
 \begin{align}
-	H(b) = (\eta(t_1, x_1, y_n; b), \ldots,  \eta(t_n, x_n, y_n; b)).
+	H(b) = (\eta(t_1, x_1, y_n; b), \ldots,  \eta(t_n, x_n, y_n; b)),
 \end{align}
+where $\mu_0$ is the prior (probability) distribution on the unknown Bathymetry $b$.
 Here we are supposing that 
 
 
@@ -160,6 +173,20 @@ The modeling questions are:
 1) what we should take $\epsilon$ the observational uncertainties? One might expect correlations between the measurement error for nearby measurement in space time but perhaps I’m being too fancy galaxy brained here.
 2) What is the the mean M and covariance structure of the prior.
 
+
+\section{Formulating the (Gaussian) Prior}
+
+\section{Numerically Resolving the Posterior}
+
+\section{Evaluating the Posterior}
+
+\subsection{Point Estimates: The Mean and Map Points}
+
+\subsection{Further Observables}
+
+\subsection{Credible Sets, Posterior Covariance}
+
+\subsection{Sensitivity Analysis}
 
 \newpage
 \section*{Acknowledgements}
