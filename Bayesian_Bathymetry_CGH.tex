@@ -168,12 +168,18 @@ and the prior distribution $\mu_0$ on $b$.
 
 Our goal will be to
 \begin{itemize}
-\item[(i)]  Lay down a physically sound, methodically precise rational for the specification of the elements defining 
-\eqref{eq:bayes:bath}.
-\item[(ii)] Systematically resolve \eqref{eq:bayes:bath} to obtain not just point estimates of $b$ but a complete
-uncertainty quantification for this estimation problem.  This will include resolution of credible sets, posterior covariances,
-`push forwards' to other relevant observable quantities, sensitivity of the posterior to data and other model (hyper)parameters
-\item[(iii)] Place  
+\item[(i)]  \emph{Lay down a physically sound, methodically precise rational for the specification of the elements defining
+\eqref{eq:bayes:bath}.}  Partially for computational reasons we will require that $\mu_0$ be Gaussian but as we lay out below in \cref{sec:prior}
+this is a quite flexible framework to incorporate existing estimates of the bottom Bathymetry (or to remain relatively neutral at the outset).
+\item[(ii)] \emph{Formulate a numerical method to resolve (e.g. sample) the posterior $\mu$.}  Assuming a Gaussian prior we describe 
+ several tractable `discretization independent' or `prior preconditioned' markov chain monte carlo (MCMC) methods which we may use to accomplish this task.
+ See \cref{sec:MCMC}
+\item[(iii)] \emph{Systematically resolve \eqref{eq:bayes:bath} to obtain not just point estimates of $b$ but a complete
+uncertainty quantification for this estimation problem.}  This will include resolution of credible sets, posterior covariances,
+`push forwards' to other relevant observable quantities, sensitivity of the posterior to data and other model (hyper)parameters.
+See \cref{sec:Bayes:Model:Eval}
+\item[(iii)] Place $\mu$ within a mathematically rigorous framework by establishing continuous dependence of $\mu$ on hyper parameters and data.  This mostly 
+involves studying the forward map $H$.
 \end{itemize}
 
 %where $\beps =  (\epsilon_1,\ldots, \epsilon_n) \sim N(0,\Sigma), h(\cdot, h_b)$ is the solution for the height of shallow water with
@@ -186,10 +192,13 @@ uncertainty quantification for this estimation problem.  This will include resol
 
 
 \section{Formulating the (Gaussian) Prior}
+\label{sec:prior}
 
 \section{Numerically Resolving the Posterior}
+\label{sec:MCMC}
 
 \section{Evaluating the Posterior}
+\label{sec:Bayes:Model:Eval}
 
 \subsection{Point Estimates: The Mean and Map Points}
 
@@ -198,6 +207,8 @@ uncertainty quantification for this estimation problem.  This will include resol
 \subsection{Credible Sets, Posterior Covariance}
 
 \subsection{Sensitivity Analysis}
+
+\section{Toward a mathematically rigorous formulation}
 
 \newpage
 \section*{Acknowledgements}
