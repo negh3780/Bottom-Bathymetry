@@ -1,0 +1,758 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=MidnightBlue,citecolor=MidnightBlue,urlcolor=MidnightBlue}
+
+% Theorem environments
+\newtheorem{remark}{Remark}
+\newtheorem{example}{Example}
+
+% Shortcuts
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Nat}{\mathbb{N}}
+\newcommand{\Cov}{\mathbf{C}}
+\newcommand{\bK}{\mathbf{K}}
+\newcommand{\bM}{\mathbf{M}}
+\newcommand{\bL}{\mathbf{L}}
+\newcommand{\bQ}{\mathbf{Q}}
+\newcommand{\bU}{\mathbf{U}}
+\newcommand{\bA}{\mathbf{A}}
+\newcommand{\bu}{\mathbf{u}}
+\newcommand{\bmm}{\mathbf{m}}
+\newcommand{\bxi}{\boldsymbol{\xi}}
+\newcommand{\bLambda}{\boldsymbol{\Lambda}}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\spn}{span}
+
+\title{Gaussian Priors for Bayesian PDE Inverse Problems:\\
+Discretization, Costs, and Two Model Problems}
+\author{Working Notes}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\bigskip
+
+%==========================================================================
+\section{Abstract Setup}\label{sec:abstract}
+%==========================================================================
+
+Let $D \subset \R^d$ be a bounded domain.  We seek to infer an unknown function $u: D \to \R$ from noisy observations of a forward map $\mathcal{G}(u)$ governed by a PDE.  We place a Gaussian prior
+\[
+  \mu_0 = \mathcal{N}(m, C)
+\]
+on $u$, where $m \in L^2(D)$ is a mean function and $C: L^2(D) \to L^2(D)$ is a symmetric, positive, \emph{trace class} operator.  Trace class means
+\[
+  \tr(C) = \sum_{k=1}^\infty \lambda_k < \infty,
+\]
+where $\{\lambda_k\}$ are the eigenvalues of $C$.  This is the necessary and sufficient condition for $\mu_0$ to be a well-defined Gaussian measure on $L^2(D)$ (equivalently, draws have finite expected $L^2$ norm: $\mathbb{E}_{\mu_0}[\|u - m\|^2] = \tr(C) < \infty$).
+
+There are three natural ways to specify $C$.
+
+
+%==========================================================================
+\section{Three Specifications of the Covariance}\label{sec:three}
+%==========================================================================
+
+%--------------------------------------------------------------------------
+\subsection{Approach 1: Karhunen--Lo\`eve / Spectral}\label{sec:KL}
+%--------------------------------------------------------------------------
+
+Choose an orthonormal basis $\{e_k\}_{k \geq 1}$ of $L^2(D)$ (e.g., Fourier modes on a periodic domain) and prescribe eigenvalues $\{\mu_k\}$ directly:
+\[
+  Cu = \sum_{k=1}^\infty \mu_k \langle e_k, u\rangle\, e_k,
+  \qquad \mu_k > 0,\quad \sum_k \mu_k < \infty.
+\]
+A standard choice is $\mu_k \sim |k|^{-2s}$ for a regularity parameter $s > d/2$; draws then lie almost surely in $H^t(D)$ for any $t < s - d/2$.
+
+\medskip\noindent\textbf{Sampling.}  A draw from $\mathcal{N}(m, C)$ is
+\[
+  u = m + \sum_{k=1}^K \sqrt{\mu_k}\, \xi_k\, e_k,
+  \qquad \xi_k \overset{\text{iid}}{\sim} \mathcal{N}(0,1),
+\]
+truncated at level $K$.  Cost: $O(K)$ per sample.
+
+\medskip\noindent\textbf{Limitation.} Requires an explicit eigenbasis for $C$ that is compatible with the domain geometry and boundary conditions.  Essentially limited to periodic domains (Fourier), rectangles (tensor-product sinusoidal bases), or domains where separation of variables applies.
+
+%--------------------------------------------------------------------------
+\subsection{Approach 2: Covariance Kernel}\label{sec:kernel}
+%--------------------------------------------------------------------------
+
+Specify a symmetric positive-definite kernel $K: D \times D \to [0,\infty)$ and define
+\[
+  Cu(x) = \int_D K(x,y)\, u(y)\, dy.
+\]
+This is well-defined and \emph{Hilbert--Schmidt} provided
+\begin{equation}\label{eq:HS}
+  \int_D \int_D |K(x,y)|^2\, dx\, dy < \infty,
+\end{equation}
+which guarantees $\sum_k \lambda_k^2 < \infty$.  However, \textbf{Hilbert--Schmidt does not imply trace class}: trace class requires the strictly stronger condition $\sum_k \lambda_k < \infty$.
+
+%--------------------------------------------------------------------------
+\subsubsection{A sufficient condition on $K$ for trace class}\label{sec:trace_class_K}
+%--------------------------------------------------------------------------
+
+The most useful sufficient condition is \textbf{continuity of $K$ on the diagonal}: if $K$ is continuous on $\overline{D} \times \overline{D}$, then the trace of $C$ is given by
+\begin{equation}\label{eq:trace_diagonal}
+  \tr(C) = \int_D K(x,x)\, dx.
+\end{equation}
+This is Mercer's theorem applied to trace: for a continuous, symmetric, positive-definite kernel on a compact domain, the eigenvalues $\{\lambda_k\}$ are non-negative, the eigenfunction expansion $K(x,y) = \sum_k \lambda_k \, e_k(x)\, e_k(y)$ converges uniformly, and integrating along the diagonal gives~\eqref{eq:trace_diagonal}.  Therefore:
+
+\medskip
+\begin{center}
+\fbox{\parbox{0.85\textwidth}{
+\textbf{Sufficient condition for trace class.}  If $K: \overline{D} \times \overline{D} \to \R$ is continuous, symmetric, and positive definite, then $C$ is trace class with $\tr(C) = \int_D K(x,x)\, dx < \infty$.
+}}
+\end{center}
+
+\medskip
+This is the condition to check in practice.  For any kernel where $K(x,x)$ is bounded (which includes all stationary kernels $K(x,y) = \varphi(x-y)$ with $\varphi(0) < \infty$), continuity of $K$ on $\overline{D} \times \overline{D}$ immediately gives trace class.
+
+\begin{example}[Mat\'ern kernel]
+The Mat\'ern kernel with smoothness $\nu > 0$, length scale $\ell > 0$, and variance $\sigma^2$ has $K(x,x) = \sigma^2$ for all $x$.  It is continuous on $\overline{D} \times \overline{D}$ for any bounded $D$.  Therefore $\tr(C) = \sigma^2 |D|$ and $C$ is trace class for \emph{any} $\nu > 0$ on bounded domains.  (On $\R^d$ the story is different---$|D| = \infty$ and trace class fails; one needs $\nu > d/2$ for draws to lie in $L^2_{\text{loc}}$.)
+\end{example}
+
+\begin{example}[Squared exponential]
+$K(x,y) = \sigma^2 \exp\bigl(-\|x - y\|^2/(2\ell^2)\bigr)$.  Again $K(x,x) = \sigma^2$ and $K$ is $C^\infty$, so $C$ is trace class on any bounded $D$.
+\end{example}
+
+\begin{remark}[Why Hilbert--Schmidt is not enough]
+The Hilbert--Schmidt condition~\eqref{eq:HS} gives $\sum_k \lambda_k^2 < \infty$, which means $\lambda_k \to 0$ but does \emph{not} force $\sum_k \lambda_k < \infty$.  As a concrete counterexample, take eigenvalues $\lambda_k = 1/k$: then $\sum_k \lambda_k^2 = \pi^2/6 < \infty$ (Hilbert--Schmidt) but $\sum_k \lambda_k = \infty$ (not trace class).  The corresponding integral operator would be Hilbert--Schmidt but not trace class, and the associated Gaussian measure would not be well-defined on $L^2(D)$.  Mercer's theorem (continuity of $K$) rules out this slow decay.
+\end{remark}
+
+
+%--------------------------------------------------------------------------
+\subsection{Approach 3: SPDE / Precision Operator}\label{sec:SPDE}
+%--------------------------------------------------------------------------
+
+The key structural result connecting Approaches~1 and~2 is the \textbf{Whittle--Mat\'ern SPDE characterization} \cite{Whittle1963,LindgrenRueLindstrom2011}: a Mat\'ern covariance with smoothness $\nu$ and length scale $\ell$ corresponds to the Green's function of the differential operator $(\kappa^2 - \Delta)^{\alpha}$ where $\alpha = \nu + d/2$ and $\kappa = \sqrt{2\nu}/\ell$.  That is,
+\[
+  C = \sigma^2 (\kappa^2 - \Delta)^{-\alpha},
+\]
+and draws from the prior satisfy the SPDE
+\[
+  (\kappa^2 - \Delta)^{\alpha/2}(u - m) = \sigma\, \mathcal{W},
+\]
+where $\mathcal{W}$ is spatial white noise.  On a periodic domain with Fourier modes $e_k$, this gives eigenvalues $\mu_k = \sigma^2(\kappa^2 + |k|^2)^{-\alpha}$, recovering Approach~1 as a special case.
+
+\medskip\noindent\textbf{Advantage.}  Instead of working with $C$ (a dense integral operator), we work with $C^{-1} = \sigma^{-2}(\kappa^2 - \Delta)^{\alpha}$ (a differential operator), which is \emph{sparse} when discretized by finite elements.  This is the basis for scalable computation on general domains.  Section~\ref{sec:SPDE_detail} develops this in full detail.
+
+
+%==========================================================================
+\section{From Continuum to Discrete: Costs of Sampling}\label{sec:discrete}
+%==========================================================================
+
+%--------------------------------------------------------------------------
+\subsection{Discretization of the Kernel Operator}\label{sec:disc_kernel}
+%--------------------------------------------------------------------------
+
+Given a kernel $K$ at the continuum level, the discrete covariance matrix $\Cov_N$ depends on how we represent $u$.
+
+\medskip\noindent\textbf{Finite differences.}  Represent $u$ by nodal values $\bu = (u(x_1),\ldots,u(x_N))^\top$ on a grid with spacing $h$.  The integral operator is approximated by quadrature:
+\[
+  Cu(x_i) \approx \sum_{j=1}^N K(x_i, x_j)\, u(x_j)\, h^d,
+\]
+so the discrete covariance matrix acting on coefficient vectors is
+\[
+  \Cov_N = h^d\, \bK, \qquad \bK_{ij} = K(x_i, x_j).
+\]
+The factor $h^d$ (the quadrature weight) ensures dimensional consistency; omitting it introduces a volume-dependent error that grows/shrinks with refinement.
+
+%--------------------------------------------------------------------------
+\subsubsection{Finite element bases: a brief tutorial}\label{sec:FEM_tutorial}
+%--------------------------------------------------------------------------
+
+The finite element method represents $u$ in a space $V_h \subset H^1(D)$ spanned by basis functions $\{\phi_1, \ldots, \phi_N\}$ associated with a mesh (triangulation in 2D, partition into intervals in 1D).  We write
+\[
+  u_h(x) = \sum_{j=1}^N u_j\, \phi_j(x),
+\]
+where $\bu = (u_1, \ldots, u_N)^\top$ is the coefficient vector.
+
+\medskip\noindent\textbf{1D piecewise-linear (``hat'') functions.}  Let $D = [a,b]$ with mesh nodes $a = x_0 < x_1 < \cdots < x_N < x_{N+1} = b$.  The hat function $\phi_j$ for interior node $x_j$ is defined by
+\[
+  \phi_j(x) = \begin{cases}
+    \dfrac{x - x_{j-1}}{x_j - x_{j-1}} & \text{if } x \in [x_{j-1}, x_j], \\[6pt]
+    \dfrac{x_{j+1} - x}{x_{j+1} - x_j} & \text{if } x \in [x_j, x_{j+1}], \\[6pt]
+    0 & \text{otherwise}.
+  \end{cases}
+\]
+Each $\phi_j$ is a ``tent'' centered at $x_j$, equal to 1 at $x_j$, zero at all other nodes, and linear in between.  The key properties:
+\begin{itemize}[nosep]
+  \item $\phi_j(x_i) = \delta_{ij}$ (the \emph{nodal interpolation} property), so $u_j = u_h(x_j)$---the coefficients \emph{are} the pointwise values at the nodes.
+  \item Each $\phi_j$ has compact support (only the two intervals adjacent to $x_j$), so inner products $\int_D \phi_i\, \phi_j\, dx$ are nonzero only when $|i - j| \leq 1$.  This makes the resulting matrices \emph{sparse} (tridiagonal in 1D, banded in higher dimensions).
+  \item $\phi_j \in H^1(D)$ (continuous, piecewise smooth), so the FEM space $V_h$ is a subspace of $H^1(D)$.
+\end{itemize}
+
+\medskip\noindent\textbf{2D piecewise-linear functions.}  Triangulate $D$ into triangles.  Each interior vertex $x_j$ gets a basis function $\phi_j$ that equals 1 at $x_j$, 0 at all other vertices, and is linear on each triangle containing $x_j$.  The support of $\phi_j$ is the ``star'' of triangles sharing vertex $x_j$.  Inner products $\int_D \phi_i\, \phi_j\, dx$ are nonzero only when $x_i$ and $x_j$ share a triangle edge, giving a sparse matrix with $O(1)$ nonzeros per row (typically 5--7 in 2D).
+
+\medskip\noindent\textbf{Higher-order elements.}  One can use piecewise-quadratic, piecewise-cubic, etc.  These add nodes at edge midpoints or interior points and give higher approximation order, but the same sparsity structure.  For our purposes, piecewise-linear is sufficient to explain the key ideas.
+
+%--------------------------------------------------------------------------
+\subsubsection{The mass matrix}\label{sec:mass}
+%--------------------------------------------------------------------------
+
+The \textbf{mass matrix} $\bM$ encodes the $L^2(D)$ inner product in the FEM basis:
+\begin{equation}\label{eq:mass}
+  \bM_{ij} = \int_D \phi_i(x)\, \phi_j(x)\, dx = \langle \phi_i, \phi_j \rangle_{L^2(D)}.
+\end{equation}
+This matrix is symmetric positive definite, sparse (same sparsity pattern as the basis---tridiagonal in 1D, banded in 2D), and plays the role of a ``change of measure'' between the coefficient vector $\bu$ and the $L^2$ function $u_h$.
+
+\medskip\noindent\textbf{Why is $\bM$ needed?}  In the spectral/KL setting, the basis $\{e_k\}$ is orthonormal, so $\langle e_i, e_j \rangle = \delta_{ij}$ and the $L^2$ inner product of two functions $\langle u, v \rangle = \sum_k \hat{u}_k \hat{v}_k$ is just the Euclidean dot product of coefficient vectors.  FEM basis functions are \emph{not} orthonormal: $\langle \phi_i, \phi_j \rangle = \bM_{ij} \neq \delta_{ij}$.  Consequently, the $L^2$ inner product of two FEM functions is
+\[
+  \langle u_h, v_h \rangle_{L^2} = \bu^\top \bM\, \mathbf{v},
+\]
+and $\bM$ appears everywhere that the $L^2$ structure is involved.
+
+\medskip\noindent\textbf{Concrete example (1D, uniform mesh).}  On $[0,1]$ with $N$ interior nodes and spacing $h = 1/(N+1)$, the mass matrix for piecewise-linear elements is the tridiagonal matrix
+\[
+  \bM = \frac{h}{6}\begin{pmatrix}
+  4 & 1 & & \\
+  1 & 4 & 1 & \\
+    & \ddots & \ddots & \ddots \\
+    & & 1 & 4
+  \end{pmatrix}.
+\]
+This is sometimes called the ``consistent mass matrix.''  A common simplification is the \textbf{lumped mass matrix} $\bM_{\text{lump}} = h\, \mathbf{I}$, obtained by summing each row of $\bM$ and placing the result on the diagonal.  Lumping replaces $\bM$ by a scalar multiple of the identity, which effectively reduces FEM to finite differences for the purpose of inner products.
+
+%--------------------------------------------------------------------------
+\subsubsection{FEM discretization of the covariance operator}\label{sec:FEM_cov}
+%--------------------------------------------------------------------------
+
+The Galerkin projection of the integral operator $Cu(x) = \int_D K(x,y)\, u(y)\, dy$ onto the FEM space $V_h$ yields the discrete covariance matrix
+\begin{equation}\label{eq:FEM_cov}
+  (\Cov_N)_{ij} = \int_D \int_D \phi_i(x)\, K(x,y)\, \phi_j(y)\, dx\, dy.
+\end{equation}
+This is a double integral, and its relationship to the pointwise kernel matrix $\bK_{ij} = K(x_i, x_j)$ and the mass matrix $\bM$ can be understood as follows.
+
+\medskip\noindent\textbf{Exact relationship.}  Think of $\Cov_N$ as testing the operator $C$ against the basis on both sides:
+\[
+  (\Cov_N)_{ij} = \langle \phi_i, C \phi_j \rangle_{L^2} 
+  = \int_D \phi_i(x) \left[\int_D K(x,y)\, \phi_j(y)\, dy\right] dx.
+\]
+If the kernel $K$ were exactly a delta function $K(x,y) = \delta(x-y)$ (the identity operator), we would get $\Cov_N = \bM$.  For a general smooth kernel, we can use the nodal interpolation property $\phi_j(x_k) = \delta_{jk}$ to write the approximation
+\[
+  \int_D K(x,y)\, \phi_j(y)\, dy \approx \sum_{\ell} K(x, x_\ell) \underbrace{\int_D \phi_\ell(y)\, \phi_j(y)\, dy}_{\bM_{\ell j}} \cdot [\text{error}],
+\]
+which, after further testing against $\phi_i$ on the left, gives the rough approximation
+\begin{equation}\label{eq:MKM}
+  \Cov_N \approx \bM\, \bK\, \bM,
+\end{equation}
+where $\bK_{ij} = K(x_i, x_j)$ and $\bM$ is the mass matrix.  This is \emph{not} exact---it is a quadrature approximation---but it captures the essential structure: the mass matrix ``sandwiches'' the pointwise kernel evaluation, converting between FEM coefficients and $L^2$ function values.
+
+\medskip\noindent\textbf{With mass lumping.}  If we replace $\bM$ by the lumped mass matrix $\bM_{\text{lump}} = h^d \mathbf{I}$ (in $d$ dimensions), then~\eqref{eq:MKM} becomes $\Cov_N \approx h^{2d} \bK$, which is (up to factors of $h^d$) the same as the finite difference discretization.  This makes precise the sense in which FD and FEM discretizations of the covariance agree when mass lumping is used.
+
+\medskip\noindent\textbf{Spectral.}  Represent $u = \sum_{k=1}^N \hat{u}_k e_k$.  Then $\Cov_N = \diag(\mu_1,\ldots,\mu_N)$.
+
+%--------------------------------------------------------------------------
+\subsection{Factorization and Sampling Costs}\label{sec:costs}
+%--------------------------------------------------------------------------
+
+Given an $N \times N$ SPD matrix $\Cov_N$, sampling from $\mathcal{N}(\bmm, \Cov_N)$ requires a square-root factorization $\Cov_N = \bA\bA^\top$, after which each draw is
+\[
+  \bu = \bmm + \bA\bxi, \qquad \bxi \sim \mathcal{N}(0, \mathbf{I}_N).
+\]
+This works because $\text{Cov}(\bA\bxi) = \bA\, \mathbf{I}\, \bA^\top = \Cov_N$.  The matrix $\bA$ is the ``square root'' of $\Cov_N$; different factorizations give different choices of $\bA$.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.6}
+\begin{tabular}{@{}p{4.5cm}cp{2.2cm}cc@{}}
+\toprule
+\textbf{Method} & \textbf{Square root $\bA$} & \textbf{Factorization cost} & \textbf{Per-sample} & \textbf{Storage} \\
+\midrule
+Cholesky: $\Cov_N = \bL\bL^\top$ 
+  & $\bA = \bL$ (lower triangular) 
+  & $\frac{1}{3}N^3$ 
+  & $\frac{1}{2}N^2$ 
+  & $\frac{1}{2}N^2$ \\[4pt]
+Eigen: $\Cov_N = \bU\bLambda\bU^\top$ 
+  & $\bA = \bU\bLambda^{1/2}$ 
+  & $\sim 9 N^3$ 
+  & $\sim N^2$ 
+  & $N^2 + N$ \\[4pt]
+Truncated eigen (rank $K$) 
+  & $\bA = \bU_K\bLambda_K^{1/2}$ ($N \times K$) 
+  & $O(KN^2)$ 
+  & $O(KN)$ 
+  & $KN + K$ \\[4pt]
+Spectral/diagonal 
+  & $\bA = \diag(\sqrt{\mu_1},\ldots,\sqrt{\mu_N})$ 
+  & $0$ 
+  & $O(N)$ 
+  & $N$ \\[4pt]
+Sparse Cholesky (SPDE) 
+  & $\bA = \sigma\, \bL_{\text{sparse}}^{-\top}$ (see~\S\ref{sec:SPDE_detail})
+  & $O(N^{3/2})$ [2D] 
+  & $O(N \log N)$ [2D] 
+  & $O(N\log N)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+In each case, the per-sample operation is a matrix-vector product $\bA\bxi$:
+\begin{itemize}[nosep]
+  \item \textbf{Cholesky:} $\bA = \bL$ is lower triangular, so $\bA\bxi$ is a triangular matrix-vector product (``forward substitution''), costing $\frac{1}{2}N^2$ flops.
+  \item \textbf{Eigendecomposition:} $\bA\bxi = \bU(\bLambda^{1/2}\bxi)$.  First scale $\bxi$ by $\sqrt{\lambda_k}$ componentwise ($O(N)$), then multiply by $\bU$ ($N^2$ flops for a dense orthogonal matrix times a vector).  Total: $\sim N^2$.
+  \item \textbf{Truncated eigen:} $\bA\bxi = \bU_K(\bLambda_K^{1/2}\bxi)$ where $\bxi \in \R^K$ and $\bU_K$ is $N \times K$.  The matvec costs $O(KN)$, which is much cheaper than $N^2$ when $K \ll N$.
+  \item \textbf{Spectral:} $\bA$ is diagonal, so $\bA\bxi$ is just componentwise multiplication: $O(N)$.
+  \item \textbf{SPDE:} sampling requires a sparse triangular solve rather than a matvec; see Section~\ref{sec:SPDE_detail}.
+\end{itemize}
+
+%--------------------------------------------------------------------------
+\subsection{When to Prefer Eigendecomposition over Cholesky}\label{sec:eigen_vs_chol}
+%--------------------------------------------------------------------------
+
+Cholesky is cheaper by a factor of $\sim 27$ in the factorization and $\sim 2$ per sample, so for pure sampling it is the default.  However, there are real reasons to prefer eigendecomposition:
+
+\begin{enumerate}[nosep, leftmargin=*]
+  \item \textbf{Truncation / low-rank approximation.}  If the eigenvalues decay rapidly (as they do for smooth kernels), keeping only $K \ll N$ dominant modes gives $\Cov_N \approx \bU_K \bLambda_K \bU_K^\top$.  Sampling then costs $O(KN)$ instead of $O(N^2)$.  For a squared exponential kernel with $N = 10^4$ and $K = 100$, this is a $100\times$ speedup per sample.  Cholesky cannot exploit this low-rank structure.
+
+  \item \textbf{Hyperparameter updates in hierarchical models.}  If the kernel depends on hyperparameters $\theta = (\ell, \sigma^2, \nu, \ldots)$ and these are updated during MCMC, the Cholesky must be recomputed from scratch at cost $\frac{1}{3}N^3$ for each new $\theta$.  With the eigendecomposition, if the eigenvectors are approximately stable (as they often are when only $\sigma^2$ or $\ell$ change moderately), one can update eigenvalues cheaply.  More importantly, the eigendecomposition gives the log-determinant as $\log\det \Cov_N = \sum_k \log \lambda_k$ (sum of $N$ log-eigenvalues, cost $O(N)$), which is needed for the marginal likelihood in model comparison.  (Cholesky also gives this: $\log\det \Cov_N = 2\sum_i \log L_{ii}$, at $O(N)$ once $\bL$ is computed.  So the log-determinant itself is not a differentiator; rather, it is the ability to \emph{selectively truncate} the spectral representation.)
+
+  \item \textbf{Diagnostics and effective dimension.}  The eigenvalues reveal the effective dimension of the prior: $d_{\text{eff}} = \sum_k \lambda_k / \lambda_1$ or similar measures.  Understanding spectral decay helps calibrate the number of MCMC samples needed and diagnose whether the prior is over- or under-regularizing relative to the data.
+
+  \item \textbf{Preconditioning the posterior.}  In some formulations (e.g., likelihood-informed subspace methods \cite{CuiMartinMarzoukEtAl2014}), one projects the posterior onto the leading eigenspace of the prior-preconditioned Hessian.  This requires the prior eigenvectors, not just the Cholesky factor.
+\end{enumerate}
+
+\begin{remark}
+If none of these apply and you just need to sample, use Cholesky.  It is simpler, faster, and numerically stabler (no risk of negative eigenvalues from roundoff in an ill-conditioned $\Cov_N$).
+\end{remark}
+
+
+%--------------------------------------------------------------------------
+\subsection{Concrete Numbers}\label{sec:numbers}
+%--------------------------------------------------------------------------
+
+Assume dense $\Cov_N$, double precision (8 bytes per entry), single-core at $10^{10}$ flops/sec.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+\textbf{Grid} & $N$ & \textbf{Storage for $\Cov_N$} & \textbf{Cholesky time} \\
+\midrule
+1D, 1000 pts & $10^3$ & 8 MB & $< 0.1$ sec \\
+2D, $100\times 100$ & $10^4$ & 800 MB & $\sim 30$ sec \\
+2D, $200\times 200$ & $4\times 10^4$ & 12.8 GB & $\sim 2000$ sec \\
+2D, $500\times 500$ & $2.5\times 10^5$ & 500 GB & infeasible \\
+3D, $50\times 50\times 50$ & $1.25\times 10^5$ & 125 GB & infeasible \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For the SPDE/sparse approach, the sparse Cholesky of the precision matrix has fill-in $O(N \log N)$ in 2D and $O(N^{4/3})$ in 3D, making it feasible well into the $N \sim 10^5$--$10^6$ range.
+
+
+%==========================================================================
+\section{SPDE Approach in Detail}\label{sec:SPDE_detail}
+%==========================================================================
+
+This section expands on Approach~3 (Section~\ref{sec:SPDE}), filling in the notation, the FEM discretization, and the reason the resulting linear algebra is cheap.
+
+%--------------------------------------------------------------------------
+\subsection{Continuum formulation}\label{sec:SPDE_cont}
+%--------------------------------------------------------------------------
+
+Fix parameters: smoothness $\nu > 0$, length scale $\ell > 0$, marginal variance $\sigma^2 > 0$.  Define
+\[
+  \kappa = \frac{\sqrt{2\nu}}{\ell}, \qquad \alpha = \nu + \frac{d}{2}.
+\]
+The parameter $\sigma^2$ is the \emph{marginal variance}---i.e., for a stationary Mat\'ern field on $\R^d$, $\text{Var}(u(x)) = \sigma^2$ for every $x$.  It is related to the SPDE driving noise intensity $\tau^2$ by the normalizing constant
+\begin{equation}\label{eq:sigma_tau}
+  \sigma^2 = \frac{\Gamma(\nu)}{\Gamma(\nu + d/2)\, (4\pi)^{d/2}\, \kappa^{2\nu}} \cdot \tau^2,
+\end{equation}
+where $\tau^2$ is the variance parameter appearing in the SPDE formulation below.  (In many references, the SPDE is written in terms of $\tau$ rather than $\sigma$; equation~\eqref{eq:sigma_tau} converts between them.)
+
+The covariance operator is
+\[
+  C = \tau^2\, L^{-\alpha}, \qquad L := \kappa^2 - \Delta,
+\]
+and the precision (inverse covariance) operator is
+\[
+  C^{-1} = \tau^{-2}\, L^{\alpha} = \tau^{-2}\, (\kappa^2 - \Delta)^{\alpha}.
+\]
+A draw $u \sim \mathcal{N}(m, C)$ satisfies the SPDE
+\begin{equation}\label{eq:SPDE}
+  L^{\alpha/2}(u - m) = \tau\, \mathcal{W},
+\end{equation}
+where $\mathcal{W}$ denotes spatial white noise on $D$.  The exponent $\alpha/2$ appears because $L^{\alpha/2}$ is the ``square root'' of the precision $L^\alpha$: if we let $w = L^{\alpha/2}(u - m)$, then $w$ has covariance $L^{\alpha/2} \cdot C \cdot L^{\alpha/2} = \tau^2 \cdot L^{\alpha/2} L^{-\alpha} L^{\alpha/2} = \tau^2 I$, which is (scaled) white noise.
+
+\medskip\noindent\textbf{What is white noise?}  Formally, $\mathcal{W}$ is a generalized Gaussian random field with $\mathbb{E}[\mathcal{W}(x)] = 0$ and $\text{Cov}(\mathcal{W}(x), \mathcal{W}(y)) = \delta(x - y)$.  It does not live in $L^2(D)$ (its ``variance'' is $\delta(0) = \infty$), but $L^{-\alpha/2}\mathcal{W}$ does, provided $\alpha > d/2$ (i.e., $\nu > 0$).  The SPDE~\eqref{eq:SPDE} is the rigorous way to define ``apply the smoothing operator $L^{-\alpha/2}$ to white noise.''
+
+%--------------------------------------------------------------------------
+\subsection{FEM discretization}\label{sec:SPDE_FEM}
+%--------------------------------------------------------------------------
+
+We discretize $L = \kappa^2 - \Delta$ using piecewise-linear finite elements on a mesh with $N$ nodes.  Define:
+
+\medskip\noindent\textbf{Stiffness matrix:}
+\begin{equation}\label{eq:stiffness}
+  \mathbf{G}_{ij} = \int_D \nabla \phi_i(x) \cdot \nabla \phi_j(x)\, dx.
+\end{equation}
+This is the FEM discretization of $-\Delta$.  It is symmetric positive \emph{semi}definite (with nullspace = constants, if no Dirichlet BCs).  Sparse: same sparsity pattern as $\bM$.
+
+\medskip\noindent\textbf{Mass matrix:} $\bM_{ij} = \int_D \phi_i(x)\, \phi_j(x)\, dx$ as in~\eqref{eq:mass}.
+
+\medskip\noindent\textbf{Discrete operator:}  The FEM discretization of $L = \kappa^2 - \Delta$ is the matrix
+\begin{equation}\label{eq:Lh}
+  \bL = \kappa^2 \bM + \mathbf{G}.
+\end{equation}
+This is sparse (same sparsity as $\bM$ and $\mathbf{G}$), symmetric, and positive definite (since $\kappa^2 > 0$).
+
+\medskip
+Now we need to discretize the SPDE~\eqref{eq:SPDE}.  The key step is handling white noise.  Testing the SPDE against basis functions $\phi_i$:
+\[
+  \int_D \phi_i(x)\, L^{\alpha/2}(u-m)(x)\, dx = \tau \int_D \phi_i(x)\, \mathcal{W}(x)\, dx.
+\]
+The right-hand side $W_i := \int_D \phi_i(x)\, \mathcal{W}(x)\, dx$ is a Gaussian random variable with
+\[
+  \text{Cov}(W_i, W_j) = \int_D \phi_i(x)\, \phi_j(x)\, dx = \bM_{ij},
+\]
+so the discrete white noise vector satisfies $\mathbf{W} \sim \mathcal{N}(0, \bM)$.
+
+%--------------------------------------------------------------------------
+\subsection{The case $\alpha = 1$ (i.e., $\nu = 1 - d/2$, only valid for $d = 1$)}\label{sec:alpha1}
+%--------------------------------------------------------------------------
+
+When $\alpha = 1$ (so $\alpha/2 = 1/2$ and $L^{1/2}$ appears), the discretization is awkward because $L^{1/2}$ is not a local operator.  We skip this case.
+
+%--------------------------------------------------------------------------
+\subsection{The case $\alpha = 2$ ($\nu = 2 - d/2$; e.g., $\nu = 3/2$ in $d=1$, $\nu = 1$ in $d=2$)}\label{sec:alpha2}
+%--------------------------------------------------------------------------
+
+This is the most important case in practice.  The precision operator is $C^{-1} = \tau^{-2} L^2$, and the SPDE is $L(u-m) = \tau\, \mathcal{W}$ (taking the square root: $L^{\alpha/2} = L^1 = L$).  Testing against $\phi_i$:
+\[
+  \int_D \phi_i \cdot L(u-m)\, dx = \tau W_i.
+\]
+Using integration by parts on the $-\Delta$ part of $L$:
+\[
+  \kappa^2 \int_D \phi_i\, (u-m)\, dx + \int_D \nabla\phi_i \cdot \nabla(u-m)\, dx = \tau W_i,
+\]
+i.e., $(\kappa^2 \bM + \mathbf{G})(\bu - \bmm) = \tau\, \mathbf{W}$, or simply
+\begin{equation}\label{eq:alpha2_system}
+  \bL\, (\bu - \bmm) = \tau\, \mathbf{W}, \qquad \mathbf{W} \sim \mathcal{N}(0, \bM).
+\end{equation}
+To sample: generate $\mathbf{W} \sim \mathcal{N}(0, \bM)$, then solve $\bL\, \mathbf{z} = \tau\, \mathbf{W}$ for $\mathbf{z}$, then set $\bu = \bmm + \mathbf{z}$.
+
+\medskip\noindent\textbf{Generating $\mathbf{W} \sim \mathcal{N}(0, \bM)$.}  We need the square root of $\bM$.  Since $\bM$ is SPD and sparse, there are two options:
+\begin{itemize}[nosep]
+  \item \textbf{Sparse Cholesky:} $\bM = \bL_M \bL_M^\top$, then $\mathbf{W} = \bL_M \bxi$ with $\bxi \sim \mathcal{N}(0, \mathbf{I})$.  Cost: one sparse triangular matvec.
+  \item \textbf{Mass lumping:} replace $\bM$ by $\bM_{\text{lump}} = \diag(m_1, \ldots, m_N)$ where $m_i = \sum_j \bM_{ij}$.  Then $\mathbf{W} = \diag(\sqrt{m_i})\, \bxi$, which is $O(N)$.  This introduces a small approximation error but is standard practice \cite{LindgrenRueLindstrom2011}.
+\end{itemize}
+
+\medskip\noindent\textbf{Solving $\bL\, \mathbf{z} = \tau\, \mathbf{W}$.}  The matrix $\bL = \kappa^2 \bM + \mathbf{G}$ is sparse and SPD.  Precompute the sparse Cholesky factorization $\bL = \bL_{\text{sp}} \bL_{\text{sp}}^\top$ once; then each sample requires two sparse triangular solves (forward and back substitution).  The cost of the sparse Cholesky depends on the mesh structure:
+\begin{itemize}[nosep]
+  \item \textbf{1D:} $\bL$ is tridiagonal.  Cholesky is $O(N)$.  Each solve is $O(N)$.
+  \item \textbf{2D:} With a good node ordering (nested dissection), the sparse Cholesky has $O(N^{3/2})$ flops for the factorization and $O(N \log N)$ flops per solve, with $O(N \log N)$ storage for the sparse factor.
+  \item \textbf{3D:} $O(N^2)$ factorization, $O(N^{4/3})$ per solve.
+\end{itemize}
+
+\medskip\noindent\textbf{What is $\bA$ for the SPDE approach?}  Combining the two steps, a sample is $\bu = \bmm + \tau\, \bL^{-1} \bL_M \bxi$.  So the ``square root'' of the discrete covariance is
+\[
+  \bA = \tau\, \bL^{-1} \bL_M,
+\]
+and $\Cov_N = \bA\bA^\top = \tau^2\, \bL^{-1} \bM\, \bL^{-\top}$.  Equivalently, the discrete \emph{precision} matrix is
+\begin{equation}\label{eq:Qh}
+  \bQ := \Cov_N^{-1} = \tau^{-2}\, \bL^\top \bM^{-1} \bL = \tau^{-2}\, \bL\, \bM^{-1}\, \bL,
+\end{equation}
+where the last equality uses symmetry of $\bL$.
+
+%--------------------------------------------------------------------------
+\subsection{Higher $\alpha$ (integer case)}\label{sec:higher_alpha}
+%--------------------------------------------------------------------------
+
+For $\alpha = 2k$ (even integer), $L^k$ is a local differential operator of order $2k$, and the SPDE $L^k(u-m) = \tau\, \mathcal{W}$ can be discretized as $\bL^k (\bu - \bmm) = \tau\, \mathbf{W}$.  Sampling requires $k$ applications of $\bL^{-1}$ to a mass-matrix-colored noise vector.  The sparse Cholesky of $\bL$ is computed once and reused.
+
+For odd $\alpha$ or non-integer $\alpha$, one cannot simply iterate $\bL^{-1}$.  The rational approximation approach of Bolin and Kirchner~\cite{BolinKirchner2020} writes
+\[
+  L^{-\alpha} \approx \sum_{j=1}^{n_{\text{rat}}} w_j\, (L + s_j I)^{-1},
+\]
+where the weights $w_j$ and shifts $s_j$ are chosen to approximate the function $t \mapsto t^{-\alpha}$ on the spectrum of $L$.  Each term $(L + s_j I)^{-1}$ is a sparse solve (same sparsity as $\bL$ but shifted), and $n_{\text{rat}}$ is typically 5--15.
+
+%--------------------------------------------------------------------------
+\subsection{Why this is cheaper: a direct comparison}\label{sec:SPDE_cost_compare}
+%--------------------------------------------------------------------------
+
+Suppose we want to sample from $\mathcal{N}(0, C)$ with a Mat\'ern covariance ($\nu = 1$, $d = 2$, so $\alpha = 2$) on a triangulated domain with $N$ nodes.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lll@{}}
+\toprule
+& \textbf{Dense kernel approach} & \textbf{SPDE approach} \\
+\midrule
+Setup & Form $\bK$ ($N^2$ entries), Cholesky ($\frac{1}{3}N^3$) & Assemble $\bL, \bM$ (sparse, $O(N)$ entries), \\
+ & & sparse Cholesky of $\bL$ ($O(N^{3/2})$ in 2D) \\
+Storage & $\frac{1}{2}N^2$ (dense triangle) & $O(N \log N)$ (sparse factor) \\
+Per sample & $\frac{1}{2}N^2$ (dense triangular matvec) & $O(N \log N)$ (sparse triangular solve) \\
+\midrule
+$N = 10^4$ setup & $3.3 \times 10^{11}$ flops ($\sim 30$ sec) & $\sim 10^6$ flops ($< 0.001$ sec) \\
+$N = 10^4$ per sample & $5 \times 10^7$ ($\sim 0.005$ sec) & $\sim 10^5$ ($< 0.001$ sec) \\
+$N = 10^4$ storage & 400 MB & $\sim 1$ MB \\
+\midrule
+$N = 10^5$ & \textbf{Infeasible} (40 TB storage) & Setup $\sim 10^{7.5}$ flops, sample $\sim 10^6$ \\
+$N = 10^6$ & \textbf{Infeasible} & Setup $\sim 10^{9}$ flops, sample $\sim 10^7$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The fundamental reason the SPDE approach wins is that it \emph{never forms the dense covariance matrix}.  It works entirely with the sparse precision operator $C^{-1}$, and sampling from $C$ reduces to solving a sparse linear system against $C^{-1}$.
+
+
+%==========================================================================
+\section{Compatibility Principle}\label{sec:compat}
+%==========================================================================
+
+\textbf{The prior discretization must be compatible with the forward map discretization.}  Specifically, the numerical representation of $u$ used for sampling from $\mathcal{N}(m,C)$ should match (or be cheaply convertible to) the representation consumed by the PDE solver computing $\mathcal{G}(u)$.  Mismatches introduce:
+\begin{itemize}[nosep]
+  \item An interpolation cost at every likelihood evaluation (potentially $O(N^2)$ or worse).
+  \item Discretization artifacts: interpolation errors that are invisible to the prior but distort the likelihood, polluting the posterior.
+  \item Inconsistent mesh refinement behavior, breaking discretization-invariance properties of algorithms like pCN.
+\end{itemize}
+
+The natural pairings are:
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Prior} & \textbf{Forward solver} & \textbf{Compatibility} \\
+\midrule
+Spectral/KL (Fourier) & Pseudospectral / spectral Galerkin & Exact: same basis \\
+SPDE/FEM & FEM on the same mesh & Exact: same nodal values \\
+Dense kernel + FD grid & FD on the same grid & Exact: same grid \\
+Kernel on grid A & FEM on mesh B & Interpolation needed \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+
+%==========================================================================
+\section{Model Problem I: Bathymetry from the Shallow Water Equations}\label{sec:SWE}
+%==========================================================================
+
+%--------------------------------------------------------------------------
+\subsection{Setup}
+%--------------------------------------------------------------------------
+
+The unknown is the bottom topography $b: D \to \R$ where $D \subset \R^d$ ($d=1$ or $d=2$) with periodic boundary conditions.  The forward map $\mathcal{G}(b)$ solves the shallow water equations
+\[
+  \partial_t h + \nabla \cdot (h \mathbf{v}) = 0,
+  \qquad
+  \partial_t (h\mathbf{v}) + \nabla \cdot \bigl(h \mathbf{v} \otimes \mathbf{v} + \tfrac{1}{2}g h^2 \mathbf{I}\bigr) = -g h \nabla b,
+\]
+where $h$ is the water depth, $\mathbf{v}$ the velocity, and $g$ the gravitational constant.  Observations are (noisy) measurements of the surface elevation $\eta = h + b$ and/or velocity at sensor locations.
+
+%--------------------------------------------------------------------------
+\subsection{Forward Map Numerics}\label{sec:SWE_numerics}
+%--------------------------------------------------------------------------
+
+\noindent\textbf{1D, periodic.}  A pseudospectral (Fourier collocation) solver is natural.  The state variables $h, v$ are represented spectrally with $N$ modes; nonlinear products are computed in physical space via FFT.  Cost per time step: $O(N \log N)$.  For $T/\Delta t$ time steps with CFL-limited $\Delta t \sim h = 1/N$, total cost per forward solve: $O(N^2 \log N)$.
+
+\medskip\noindent\textbf{2D, periodic.}  Same pseudospectral approach on an $N_x \times N_y$ grid ($N = N_x N_y$ total DOFs).  Cost per time step: $O(N \log N)$ via 2D FFT.  Total: $O(N \cdot (N_x + N_y) \log N)$ accounting for the CFL condition $\Delta t \sim \min(h_x, h_y)$.
+
+\medskip\noindent\textbf{Alternative:} Finite volume / discontinuous Galerkin on unstructured meshes.  More flexible for non-periodic BCs, but $O(N)$ per time step with larger constants.
+
+%--------------------------------------------------------------------------
+\subsection{Prior Costs and Compatibility}\label{sec:SWE_costs}
+%--------------------------------------------------------------------------
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{2.5cm}p{2.5cm}p{2.5cm}p{2.5cm}p{2.8cm}@{}}
+\toprule
+& \textbf{Prior sample} & \textbf{Forward solve} & \textbf{Compatible?} & \textbf{Verdict} \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{1D periodic, $N$ modes/points}} \\
+\midrule
+Spectral/KL & $O(N)$ & $O(N^2 \log N)$ & Exact & \textcolor{OliveGreen}{\textbf{Ideal}} \\
+Dense kernel & $O(N^2)$ setup; $O(N^2)$/sample & $O(N^2 \log N)$ & Grid match & Feasible for $N \leq 10^3$ \\
+SPDE/FEM & $O(N)$ & $O(N^2 \log N)$ & Interpolation & Unnecessary overhead \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{2D periodic, $N = N_x \times N_y$ total DOFs}} \\
+\midrule
+Spectral/KL & $O(N)$ & $O(N^{3/2} \log N)$ & Exact & \textcolor{OliveGreen}{\textbf{Ideal}} \\
+Dense kernel & $O(N^3)$ setup & $O(N^{3/2} \log N)$ & Grid match & \textcolor{Red}{\textbf{Infeasible}} for $N > 10^4$ \\
+SPDE/FEM & $O(N \log N)$ & $O(N^{3/2} \log N)$ & Interpolation & Viable if non-periodic \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip\noindent\textbf{Bottom line for bathymetry (periodic).}  The spectral/KL prior is the clear winner.  The periodic domain and pseudospectral forward solver are perfectly matched.  Sampling cost is negligible relative to the forward solve in both 1D and 2D.  There is no reason to use the kernel or SPDE approach unless one moves to non-periodic geometries (e.g., a coastal domain with open boundaries), at which point the SPDE/FEM prior paired with a DG or FV solver becomes the natural choice.
+
+
+%==========================================================================
+\section{Model Problem II: Disorder in Majorana Nanowires}\label{sec:BdG}
+%==========================================================================
+
+%--------------------------------------------------------------------------
+\subsection{Setup}
+%--------------------------------------------------------------------------
+
+The unknown is a disorder potential $V: [0, L] \to \R$ along a 1D nanowire of length $L$.  The forward map $\mathcal{G}(V)$ returns the differential conductance $G(E)$ at specified energies $E$, computed as follows:
+\begin{enumerate}[nosep]
+  \item \textbf{Tight-binding BdG Hamiltonian.}  Discretize $[0,L]$ into $N_{\text{sites}}$ lattice sites.  The Bogoliubov--de~Gennes Hamiltonian $H_{\text{BdG}}(V)$ is a $4N_{\text{sites}} \times 4N_{\text{sites}}$ sparse (block-tridiagonal) matrix encoding hopping, spin--orbit coupling, Zeeman splitting, superconducting pairing, and the on-site disorder $V$.
+  \item \textbf{Scattering matrix.}  Attach semi-infinite leads and compute the scattering matrix $S(E)$ at energy $E$.  This requires solving a linear system of size $4N_{\text{sites}} \times 4N_{\text{sites}}$ (effectively a discrete Sturm--Liouville/Green's function problem for the block-tridiagonal $H_{\text{BdG}}$).
+  \item \textbf{Conductance.}  Extract the conductance from the transmission block of $S(E)$ via the Landauer--B\"uttiker formula: $G(E) = (e^2/h)\, \tr(t^\dagger t)$.
+\end{enumerate}
+
+%--------------------------------------------------------------------------
+\subsection{Forward Map Numerics}\label{sec:BdG_numerics}
+%--------------------------------------------------------------------------
+
+The dominant cost is the scattering matrix computation.  Two standard approaches:
+
+\medskip\noindent\textbf{Direct (recursive Green's function).}  Exploit the block-tridiagonal structure.  Sweep left-to-right, inverting one $4 \times 4$ block at each site.  Cost: $O(N_{\text{sites}} \cdot 4^3) = O(64\, N_{\text{sites}})$ per energy $E$.  For $N_E$ energy values, total cost is $O(64\, N_{\text{sites}} \cdot N_E)$.  Typical scales: $N_{\text{sites}} \sim 10^2$--$10^3$, $N_E \sim 10^1$--$10^2$, so $\sim 10^5$--$10^7$ flops per forward evaluation.  This is \textbf{very cheap}.
+
+\medskip\noindent\textbf{Transfer matrix.}  Multiply $4\times 4$ transfer matrices along the chain.  Same $O(N_{\text{sites}})$ scaling but numerically unstable for long wires; stabilized variants exist.
+
+\medskip\noindent The key structural feature: the forward map takes a \textbf{vector} $\mathbf{V} = (V_1, \ldots, V_{N_{\text{sites}}})$ of on-site potentials.  The unknown function $V(x)$ is sampled at lattice sites---this is a finite difference discretization with $N = N_{\text{sites}}$ and spacing $a$ (the lattice constant).
+
+%--------------------------------------------------------------------------
+\subsection{Prior Costs and Compatibility}\label{sec:BdG_costs}
+%--------------------------------------------------------------------------
+
+Since the physical model is defined on a discrete lattice, $N = N_{\text{sites}}$ is small (typically $10^2$--$10^3$).  This completely changes the cost picture.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{2.5cm}p{3.2cm}p{2.5cm}p{2.3cm}p{2.8cm}@{}}
+\toprule
+& \textbf{Prior sample} & \textbf{Forward solve} & \textbf{Compatible?} & \textbf{Verdict} \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{1D lattice, $N = N_{\text{sites}} \sim 10^2$--$10^3$}} \\
+\midrule
+Spectral/KL & $O(N)$ & $O(N)$ & Need DFT & \textcolor{OliveGreen}{\textbf{Excellent}} \\
+Dense kernel + Cholesky & $\frac{1}{3}N^3$ setup; $\frac{1}{2}N^2$/sample & $O(N)$ & Exact & \textcolor{OliveGreen}{\textbf{Excellent}} \\
+SPDE/FEM & $O(N)$ (tridiag) & $O(N)$ & Exact & \textcolor{OliveGreen}{\textbf{Excellent}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip\noindent\textbf{Detailed cost comparison for $N = 500$, $N_E = 50$:}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Operation} & \textbf{Flops} & \textbf{Time @ $10^{10}$ flops/s} & \textbf{Notes} \\
+\midrule
+Forward solve & $\sim 1.6 \times 10^6$ & $< 0.001$ sec & $64 \times 500 \times 50$ \\
+Spectral prior sample & $\sim 500$ & negligible & $O(N)$ \\
+Dense kernel sample & $\sim 1.25 \times 10^5$ & negligible & $\frac{1}{2}N^2$ \\
+Cholesky factorization (once) & $\sim 4.2 \times 10^7$ & $\sim 0.004$ sec & $\frac{1}{3}N^3$ \\
+Eigendecomposition (once) & $\sim 1.1 \times 10^9$ & $\sim 0.1$ sec & $\sim 9N^3$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip\noindent\textbf{Bottom line for the nanowire problem.}  At these scales ($N \sim 10^2$--$10^3$), \emph{all three prior approaches are trivially affordable}.  The forward solve itself is cheap ($\sim 10^6$ flops), and even the dense kernel Cholesky is a one-time cost under a second.  This means you have \textbf{complete freedom in prior choice}---the numerical bottleneck is not the prior but rather the total number of MCMC samples needed for posterior exploration.  The dense kernel approach becomes attractive here precisely because it offers maximum modeling flexibility (arbitrary covariance structure, nonstationary kernels, learned hyperparameters) at negligible computational overhead.
+
+\begin{remark}[Spectral/KL for the lattice model]
+On a 1D lattice with $N$ sites, a natural choice is the DFT basis.  If the forward map takes pointwise values $V_j = V(x_j)$, converting from spectral coefficients $\hat{V}_k$ to site values requires an FFT: $O(N \log N)$.  At $N = 500$ this is $\sim 4500$ flops, still negligible.  However, the lattice is not periodic (the wire has open ends attached to leads), so the Fourier basis is not the most natural; a DCT basis (cosine modes) or direct dense kernel may be more appropriate.
+\end{remark}
+
+
+%==========================================================================
+\section{Comparative Summary}\label{sec:summary}
+%==========================================================================
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{3cm}p{5.5cm}p{5.5cm}@{}}
+\toprule
+& \textbf{Bathymetry (SWE)} & \textbf{Nanowire (BdG)} \\
+\midrule
+Domain & $D \subset \R^d$, $d = 1,2$; periodic & $[0,L]$, discrete lattice; open ends \\
+$N$ (DOFs) & $10^2$--$10^5$ & $10^2$--$10^3$ \\
+Forward cost & $O(N^2 \log N)$ [1D]; $O(N^{3/2}\log N)$ [2D] & $O(N)$ per energy \\
+Bottleneck & Forward solve dominates & Neither; total MCMC iterations \\
+Best prior (periodic) & Spectral/KL & Any; dense kernel most flexible \\
+Kernel approach viable? & 1D yes; 2D infeasible (dense) & Yes, easily \\
+SPDE approach needed? & Only for non-periodic domains & No advantage at this scale \\
+Key compatibility & Spectral prior $\leftrightarrow$ pseudospectral PDE & Site values $\leftrightarrow$ on-site potential \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+The two problems occupy opposite ends of the computational spectrum.  For bathymetry in 2D, the forward solve is expensive and the prior \emph{must} be cheap and compatible (spectral is the only practical choice on periodic domains; SPDE/FEM is needed for general geometries).  For the nanowire, the forward map is so inexpensive that prior cost is irrelevant---one should choose the prior purely on modeling grounds (e.g., smoothness, stationarity, ability to encode physical constraints), without any numerical constraint.
+
+
+%==========================================================================
+\section{Practical Recommendations}\label{sec:recommendations}
+%==========================================================================
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{For the bathymetry problem on periodic domains:}  Use the spectral/KL prior with eigenvalues $\mu_k \sim (\kappa^2 + |k|^2)^{-\alpha}$ (Mat\'ern-like decay) and a pseudospectral SWE solver.  The pCN / mpCN / MTpCN proposals are trivially cheap.  If non-periodic domains are needed in the future, transition to an SPDE/FEM prior paired with a DG forward solver.
+
+  \item \textbf{For the nanowire problem:}  Start with the dense kernel approach.  Choose a Mat\'ern or squared-exponential kernel $K(x_i, x_j)$ with hyperparameters (length scale $\ell$, variance $\sigma^2$, smoothness $\nu$).  Precompute the Cholesky factorization once (cost $\sim \frac{1}{3}N^3 \sim 10^7$ flops for $N = 500$, negligible).  This gives maximum flexibility for:
+  \begin{itemize}[nosep]
+    \item Hierarchical inference on $\ell, \sigma^2, \nu$ (update the Cholesky when hyperparameters change---still cheap at $N \leq 10^3$).
+    \item Nonstationary priors if physical considerations suggest the disorder varies differently near the contacts vs.\ the bulk.
+    \item Model comparison via evidence (the log-determinant $\log\det \Cov_N$ is a byproduct of the Cholesky: $\log\det \Cov_N = 2 \sum_i \log L_{ii}$).
+  \end{itemize}
+
+  \item \textbf{For pCN/multiproposal methods in general:}  The key requirement is the ability to draw $\xi \sim \mathcal{N}(0, C)$ quickly.  All three approaches satisfy this when properly matched to the problem scale and domain geometry.  The spectral approach gives $O(N)$ draws with zero setup on simple geometries; the SPDE approach gives $O(N \log N)$ draws on complex geometries; the dense kernel gives $O(N^2)$ draws (after $O(N^3)$ setup) but is limited to $N \leq 10^3$--$10^4$.
+\end{enumerate}
+
+
+%==========================================================================
+\begin{thebibliography}{99}
+%==========================================================================
+
+\bibitem{BolinKirchner2020}
+D.~Bolin and K.~Kirchner,
+\emph{The rational SPDE approach for Gaussian random fields with general smoothness},
+J.\ Comput.\ Graph.\ Statist.\ \textbf{29} (2020), 274--285.
+
+\bibitem{CotterRobertsStuartEtAl2013}
+S.~L.~Cotter, G.~O.~Roberts, A.~M.~Stuart, and D.~White,
+\emph{MCMC methods for functions: modifying old algorithms to make them faster},
+Statist.\ Sci.\ \textbf{28} (2013), 424--446.
+
+\bibitem{CuiMartinMarzoukEtAl2014}
+T.~Cui, K.~J.~H.~Law, and Y.~M.~Marzouk,
+\emph{Likelihood-informed dimension reduction for nonlinear inverse problems},
+Inverse Problems \textbf{30} (2014), 114015.
+
+\bibitem{DashtiStuart2017}
+M.~Dashti and A.~M.~Stuart,
+\emph{The Bayesian approach to inverse problems},
+in: Handbook of Uncertainty Quantification, Springer, 2017, pp.~311--428.
+
+\bibitem{LindgrenRueLindstrom2011}
+F.~Lindgren, H.~Rue, and J.~Lindstr\"om,
+\emph{An explicit link between Gaussian fields and Gaussian Markov random fields: the stochastic partial differential equation approach},
+J.\ R.\ Statist.\ Soc.\ B \textbf{73} (2011), 423--498.
+
+\bibitem{RasmussenWilliams2006}
+C.~E.~Rasmussen and C.~K.~I.~Williams,
+\emph{Gaussian Processes for Machine Learning},
+MIT Press, 2006.
+
+\bibitem{RueHeld2005}
+H.~Rue and L.~Held,
+\emph{Gaussian Markov Random Fields: Theory and Applications},
+Chapman \& Hall/CRC, 2005.
+
+\bibitem{Stuart2010}
+A.~M.~Stuart,
+\emph{Inverse problems: a Bayesian perspective},
+Acta Numerica \textbf{19} (2010), 451--559.
+
+\bibitem{Whittle1963}
+P.~Whittle,
+\emph{Stochastic processes in several dimensions},
+Bull.\ Int.\ Statist.\ Inst.\ \textbf{40} (1963), 974--994.
+
+\end{thebibliography}
+
+\end{document}
