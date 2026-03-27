@@ -4,8 +4,8 @@
 
 
 \title{A Bayesian Framework for Bathymetry Estimation from Surface Measurements of a Shallow Fluid}
-\author{Patricio Clark Di Leoni, Nathan Glatt-Holtz\\
-  \scriptsize{emails: negh@iu.edu, pclarkdileoni@udesa.edu.ar}}
+%\author{Patricio Clark Di Leoni, Nathan Glatt-Holtz\\
+%  \scriptsize{emails: negh@iu.edu, pclarkdileoni@udesa.edu.ar}}
 
 %\date{}
 
@@ -65,7 +65,10 @@
 \newcommand{\beps}{\boldsymbol{\epsilon}}
 \newcommand{\Obs}{\mathcal{O}}
 \newcommand{\bfY}{\mathbf{Y}}
+\newcommand{\cC}{\mathcal{C}}
 
+\newcommand{\bfx}{\mathbf{x}}
+\newcommand{\tbfx}{\tilde{\mathbf{x}}}
 
 
 %%%%%%
@@ -117,12 +120,21 @@ initial conditions
 \begin{align}
 	h(0,x,y) = h_0(x,y), \quad u(0,x,y) = u_0(x,y), \quad v(0,x,y) = v_0(x,y),
 \end{align}
-and boundary conditions.  Regarding the spatial domain $D$ on which \eqref{eq:sw:h}--\eqref{eq:sw:v}  and associated boundary 
-conditions a pragmatic starting point would be to consider a periodic box of length $[-L,L]$ for some $L \gg 1$.\footnote{In any case the fluid domain $D$ of definition needs to be defined and in general $D$ is not fixed. Even if
+and boundary conditions.  Regarding the spatial domain $D$ on which \eqref{eq:sw:h}--\eqref{eq:sw:v} and the associated boundary 
+conditions a pragmatic starting point would be to consider a periodic box of length $[-L,L]^2$ for some 
+$L \gg 1$.\footnote{In any case the fluid domain $D$ of definition needs to be defined and in general $D$ is not fixed. Even if
 we imposed e.g. periodic boundary conditions the fluid motion here is hyperbolic and can form
 shocks in finite time.   At least from an analysis point of view we may wish to 
 impose further conditions (small data? viscous dissipation?) to obtain a more mathematically (and numerically?) tractable set 
-of equations.}   
+of equations.}   Another possible simplification initially would be to consider a homogeneity in the $y$-direction and hence
+to consider the 1-D shallow water equations:
+\begin{align}
+    &h_t + (hu)_x= 0,
+    \label{eq:sw:1d:h}\\
+   &(hu)_t + \bigl(hu^2 + \tfrac{1}{2}gh^2\bigr)_{\!x}  = -ghb_x.
+    \label{eq:sw:1d:u}
+\end{align}
+
 
 We will measure the surface elevation $\eta$ that is
 \begin{align}
@@ -138,7 +150,12 @@ where $((t_1, x_1, y_1),\ldots, (t_n, x_n, y_n))$ are the observation locations 
 corruption in the measurement of $(\eta(t_1, x_1, y_n; b), \ldots,  \eta(t_n, x_n, y_n; b))$.\footnote{More generally we can just as well consider $y_i = \Obs_j(\eta(b)) + \epsilon_i$ where the $\Obs_j$'s are observation
 operators.  These $\Obs_j$ could be spatial temporal averages of $\eta$.  Of course the special case of spatial-temporal point observations is given by $\Obs_j(\eta) = \eta(t_j, x_j, y_j)$.}
 
-Suppose that the $\beps \sim N(0, \Sigma)$, that is a Gaussian mean free error, with Covariance $\Sigma$.  Note that this $\Sigma$ includes the possibility of correlations in the observation noise.  
+Suppose that  
+\begin{align}
+\label{eq:gaussian:obs}
+	\beps \sim N(0, \Sigma), 
+\end{align}
+namely $\beps$ is a Gaussian mean free error, with Covariance $\Sigma$.  Note that this $\Sigma$ includes the possibility of correlations in the observation noise.  
 In this situation we then have a  likelihood of $b$ of the form
 \begin{align}
 	\mathcal{L}(b; \bfY) = \frac{1}{\sqrt{ (2\pi)^n \det(\Sigma)}} \exp\left( -\frac{1}{2} | \Sigma^{1/2} (\bfY - H(b)) |^2\right).
@@ -150,7 +167,7 @@ Thus, in statistical language, optimizing the quadratic loss function
 amounts to computing the Maximum Likelihood estimator for the measurement model \eqref{eq:obs:proceedure}.
 
 
-Here we would like to treat the problem of formulating, resolving and analyzin the Bayesian posterior 
+Here we would like to treat the problem of formulating, resolving and analyzing the Bayesian posterior 
 for the bottom boundary given data points $\bfY= (y_1, …, y_n)$ as 
 \begin{align}
 	\label{eq:bayes:bath}
@@ -159,10 +176,28 @@ for the bottom boundary given data points $\bfY= (y_1, …, y_n)$ as
 where $H$ is the `forward-map' defined as
 \begin{align}
 	\label{eq:forward:map}
-	H(b) = (\eta(t_1, x_1, y_n; b), \ldots,  \eta(t_n, x_n, y_n; b)),
+	H(b) = (\eta(t_1, x_1, y_1; b), \ldots,  \eta(t_n, x_n, y_n; b)),
 \end{align}
-where $\mu_0$ is the prior (probability) distribution on the unknown Bathymetry $b$.
-Thus, in order to specify the estimation and uncertainty quantification problem around \eqref{eq:bayes:bath},
+and where $\mu_0$ is the prior (probability) distribution on the unknown Bathymetry $b$.  For both the numerical
+traceability of our monte carlo scheme to resolve \eqref{eq:bayes:bath} and for it's flexibly as a modeling device 
+we will consider 
+\begin{align}
+\label{eq:gaussian:prior}
+	\mu_0 = N(b_m, \cC) \quad \text{ so that formally } 
+	\mu_0(d b) \propto \exp( - \frac{1}{2} \| \cC^{-1/2} (b_m - b)\|^2) d b.
+\end{align}
+Here $b_m$ is our mean prior Bathymetry profile.  Regarding the covariance $\cC$ we may 
+start, based on our degree of initial uncertainty for $b$, by specifying the two point covariances 
+\begin{align}
+\label{eq:2pt:cov:def}
+	K(\bfx, \tbfx) = \EE(( b_0(\bfx) -  b_m(\bfx))(b_0(\tbfx) - b_m(\tbfx)))
+\end{align}
+and then build $\cC$ as
+\begin{align}
+\label{eq:cov:from:2pt}
+	\cC f(\bfx) = \int K(\bfx, \tbfx) f(\tbfx) d \tbfx.
+\end{align}
+Thus, in summary,  in order to specify the estimation and uncertainty quantification problem around \eqref{eq:bayes:bath},
 we need specify, in addition to all of the details of the map $H$, the observation noise covariance $\Sigma$
 and the prior distribution $\mu_0$ on $b$.
 
@@ -191,8 +226,19 @@ involves studying the forward map $H$.
 %2) What is the the mean M and covariance structure of the prior.
 
 
+\section{The Forward Map and its numerical resolution}
+
+\begin{itemize}
+\item 1D version.
+\item Spectral Method.
+\end{itemize}
+
 \section{Formulating the (Gaussian) Prior}
 \label{sec:prior}
+
+In order to set down the details for how we can specify $\mu_0$ \eqref{eq:gaussian:prior} and then numerically draw from $\mu_0$
+as will be needed in \eqref{sec:MCMC} let us briefly review for the formal d
+
 
 \section{Numerically Resolving the Posterior}
 \label{sec:MCMC}
