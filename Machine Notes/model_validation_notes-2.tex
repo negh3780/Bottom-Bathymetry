@@ -1,0 +1,805 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{mathtools}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\cM}{\mathcal{M}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prb}{\mathbb{P}}
+
+\theoremstyle{plain}
+\newtheorem{proposition}{Proposition}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+\theoremstyle{definition}
+\newtheorem{example}{Example}
+
+\title{Notes on Model Validation in Bayesian Inverse Problems\\[6pt]
+\large With Application to Disorder Inference in Majorana Nanowires}
+\author{Nathan Glatt-Holtz}
+\date{Last updated: \today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+%% ===================================================================
+\section{Setting and Motivation}
+%% ===================================================================
+
+\subsection{The general Bayesian inverse problem}
+
+We consider the standard framework for Bayesian inversion. Let 
+$\theta \in \Theta$ be an unknown parameter (possibly infinite-dimensional), 
+$\cG: \Theta \to \R^d$ a forward map, and $\mathbf{y} \in \R^d$ observed 
+data related to $\theta$ by the measurement model
+\begin{equation}\label{eq:measurement}
+\mathbf{y} = \cG(\theta) + \eta, \qquad \eta \sim p_\eta,
+\end{equation}
+where $\eta$ is observation noise with known (or partially known) distribution 
+$p_\eta$. In the Gaussian case, $\eta \sim N(0, \Sigma)$ with known covariance 
+$\Sigma \in \R^{d \times d}$, and the likelihood is
+\begin{equation}\label{eq:likelihood}
+L(\mathbf{y} \mid \theta) = (2\pi)^{-d/2}|\Sigma|^{-1/2}
+\exp\Bigl(-\tfrac{1}{2}\|\Sigma^{-1/2}(\mathbf{y} - \cG(\theta))\|^2\Bigr).
+\end{equation}
+Given a prior distribution $\pi_0(\theta)$, the posterior is
+\begin{equation}\label{eq:posterior}
+\pi(\theta \mid \mathbf{y}) = \frac{L(\mathbf{y} \mid \theta)\,\pi_0(\theta)}{Z},
+\qquad Z := \int_\Theta L(\mathbf{y} \mid \theta)\,\pi_0(\theta)\,d\theta,
+\end{equation}
+where $Z$ is the \textbf{evidence} (marginal likelihood). In practice, 
+$\pi(\theta \mid \mathbf{y})$ is explored via MCMC, which produces samples 
+$\theta^{(1)}, \ldots, \theta^{(K)} \sim \pi(\theta \mid \mathbf{y})$ but 
+does not directly compute $Z$.
+
+\subsection{The model criticism question}
+
+The posterior~\eqref{eq:posterior} is the optimal answer to the question: 
+``Given that the measurement model~\eqref{eq:measurement} is correct, what 
+can we learn about $\theta$?'' But it does not answer the prior question: 
+\emph{is the model correct?}
+
+Model misspecification can take several forms:
+\begin{enumerate}[label=(\roman*)]
+\item The forward map $\cG$ does not capture the true physics (e.g., the 
+  physical model is missing degrees of freedom, or uses an incorrect 
+  constitutive law).
+\item The noise model $p_\eta$ is wrong (e.g., the noise is non-Gaussian, 
+  or the covariance $\Sigma$ is misspecified).
+\item The prior $\pi_0$ is too restrictive (e.g., the true parameter lies 
+  outside the support of $\pi_0$, or the smoothness assumptions are wrong).
+\item The parameterization of $\theta$ is insufficient (e.g., the unknown 
+  is really a function but is being approximated by too few basis coefficients).
+\end{enumerate}
+
+This document describes four complementary approaches to detecting and 
+diagnosing these failures within the Bayesian framework:
+posterior predictive checks (\S\ref{sec:ppc}), 
+Bayesian model comparison via the evidence (\S\ref{sec:evidence}), 
+hierarchical inference of hyperparameters (\S\ref{sec:hierarchical}), and 
+residual analysis (\S\ref{sec:residuals}).
+
+%% ===================================================================
+\section{Posterior Predictive Checks}\label{sec:ppc}
+%% ===================================================================
+
+\subsection{The posterior predictive distribution}
+
+Given posterior samples $\theta^{(k)} \sim \pi(\theta \mid \mathbf{y})$, the 
+\textbf{posterior predictive distribution} is the distribution of hypothetical 
+future data $\mathbf{y}^{\text{rep}}$ generated under the fitted model:
+\begin{equation}\label{eq:ppd}
+p(\mathbf{y}^{\text{rep}} \mid \mathbf{y}) 
+= \int L(\mathbf{y}^{\text{rep}} \mid \theta)\,\pi(\theta \mid \mathbf{y})\,d\theta.
+\end{equation}
+In practice this integral is evaluated by Monte Carlo: for each posterior 
+sample $\theta^{(k)}$, draw $\mathbf{y}^{(k)} \sim L(\cdot \mid \theta^{(k)})$, 
+i.e.,
+\begin{equation}\label{eq:ppd_sample}
+\theta^{(k)} \sim \pi(\theta \mid \mathbf{y}), \qquad
+\mathbf{y}^{(k)} = \cG(\theta^{(k)}) + \eta^{(k)}, \qquad
+\eta^{(k)} \sim p_\eta \;\text{(fresh, independent noise)}.
+\end{equation}
+The collection $\{\mathbf{y}^{(1)}, \ldots, \mathbf{y}^{(K)}\}$ is a sample 
+from~\eqref{eq:ppd}.
+
+\subsection{Summary statistics and the posterior predictive p-value}
+
+The key idea: if the model is correct, the observed data $\mathbf{y}$ should 
+be a ``typical'' draw from the posterior predictive 
+distribution~\eqref{eq:ppd}. To make this precise, choose a scalar 
+\textbf{summary statistic} (also called a \textbf{test quantity}) 
+$T: \R^d \to \R$ and compare $T(\mathbf{y})$ to the distribution of 
+$T(\mathbf{y}^{(k)})$.
+
+\begin{enumerate}[label=\textbf{Step \arabic*.}]
+\item Generate $K$ replicated datasets $\mathbf{y}^{(1)}, \ldots, 
+  \mathbf{y}^{(K)}$ via~\eqref{eq:ppd_sample}. (You already have 
+  the posterior samples from MCMC; the only additional cost is 
+  evaluating $\cG(\theta^{(k)})$, which you have already done during 
+  the MCMC run, plus drawing fresh noise $\eta^{(k)}$.)
+\item Compute the histogram of $\{T(\mathbf{y}^{(1)}), \ldots, 
+  T(\mathbf{y}^{(K)})\}$.
+\item Compute $T(\mathbf{y})$ for the actual observed data.
+\item Report the \textbf{posterior predictive p-value}:
+  \begin{equation}\label{eq:ppp}
+  p_B := \frac{1}{K}\sum_{k=1}^K \mathbf{1}\bigl[T(\mathbf{y}^{(k)}) 
+  \geq T(\mathbf{y})\bigr].
+  \end{equation}
+\end{enumerate}
+
+\noindent\textbf{Interpretation.} If $p_B$ is close to 0 or 1, the observed 
+data is in the tail of the predictive distribution for that statistic, which 
+is evidence that the model cannot reproduce the feature captured by $T$. 
+Values in $[0.1, 0.9]$ indicate no evidence of misspecification (for that 
+particular $T$).
+
+\subsection{How to choose the summary statistic $T$}
+
+The choice of $T$ is the art of posterior predictive checking. There is no 
+single ``right'' choice; different statistics probe different aspects of the 
+model. The general principles are:
+\begin{enumerate}[label=(\alph*)]
+\item \textbf{Omnibus statistics} test overall fit. The most common is the 
+  chi-squared discrepancy:
+  \begin{equation}\label{eq:T_chi2}
+  T_{\chi^2}(\mathbf{y}, \theta) 
+  = \|\Sigma^{-1/2}(\mathbf{y} - \cG(\theta))\|^2.
+  \end{equation}
+  Note that this $T$ depends on both $\mathbf{y}$ and $\theta$, so the 
+  p-value~\eqref{eq:ppp} becomes
+  $p_B = \frac{1}{K}\sum_k \mathbf{1}[T_{\chi^2}(\mathbf{y}^{(k)}, 
+  \theta^{(k)}) \geq T_{\chi^2}(\mathbf{y}, \theta^{(k)})]$.
+  This catches overall lack of fit but can miss structured discrepancies.
+
+\item \textbf{Targeted statistics} probe specific features:
+  \begin{itemize}
+  \item Location of a peak: $T(\mathbf{y}) = \arg\max_i y_i$.
+  \item Symmetry: $T(\mathbf{y}) = \|y_{\text{left}} - y_{\text{right}}\|$ 
+    for data components that should be symmetric under the model.
+  \item Smoothness: $T(\mathbf{y}) = \sum_i (y_{i+1} - y_i)^2$ (total 
+    variation).
+  \item Tail behavior: $T(\mathbf{y}) = \max_i |y_i|$.
+  \end{itemize}
+
+\item \textbf{Use multiple statistics.} Check 3--5 different $T$'s, each 
+  probing a different model assumption. If all give $p_B \in [0.1, 0.9]$, 
+  there is no evidence of misspecification. If one gives an extreme $p_B$, 
+  the specific $T$ that flagged it tells you \emph{what} the model is 
+  getting wrong.
+\end{enumerate}
+
+\subsection{Limitations of posterior predictive checks}
+
+\begin{enumerate}[label=(\roman*)]
+\item \textbf{Double use of data.} The data $\mathbf{y}$ is used both to 
+  fit the posterior and to compute $T(\mathbf{y})$. This makes the 
+  p-value~\eqref{eq:ppp} conservative: it is biased toward 0.5 and can 
+  fail to detect real misspecification. The severity of this bias depends 
+  on the ``effective number of parameters'' in the model --- it is worst 
+  when the model is highly flexible.
+
+\item \textbf{Cross-validation variants.} To avoid the double-use problem, 
+  one can hold out a subset of the data $\mathbf{y}_{\text{test}}$ and use 
+  the remaining data $\mathbf{y}_{\text{train}}$ to fit the posterior. Then 
+  the predictive check is performed on $\mathbf{y}_{\text{test}}$. This is 
+  sharper but more expensive (multiple MCMC runs, or importance-weight 
+  resampling from a single run).
+
+\item \textbf{No formal ``rejection.''} Posterior predictive p-values are 
+  not classical p-values; they do not have a uniform null distribution 
+  under the model. They are best treated as continuous diagnostics, not 
+  binary hypothesis tests.
+\end{enumerate}
+
+
+%% ===================================================================
+\section{Bayesian Model Comparison via the Evidence}\label{sec:evidence}
+%% ===================================================================
+
+\subsection{The Bayes factor}
+
+Suppose we have two candidate models $\cM_1$ and $\cM_2$, each specifying 
+a forward map $\cG_i$, a noise model $p_{\eta,i}$, and a prior $\pi_{0,i}$ 
+on the respective parameter spaces $\Theta_i$. The evidence for model $\cM_i$ 
+is
+\begin{equation}\label{eq:evidence}
+Z_i := \int_{\Theta_i} L_i(\mathbf{y} \mid \theta)\,\pi_{0,i}(\theta)\,d\theta,
+\end{equation}
+which is the normalizing constant of the posterior~\eqref{eq:posterior} under 
+model $\cM_i$. The \textbf{Bayes factor} in favor of $\cM_1$ over $\cM_2$ is
+\begin{equation}\label{eq:bayes_factor}
+B_{12} := \frac{Z_1}{Z_2}.
+\end{equation}
+If $B_{12} > 1$, the data favor $\cM_1$; if $B_{12} < 1$, they favor $\cM_2$. 
+The Jeffreys scale (a rough guideline): $B_{12} > 10$ is ``strong'' evidence, 
+$B_{12} > 100$ is ``decisive.''
+
+\begin{remark}[Built-in Occam's razor]
+The evidence~\eqref{eq:evidence} is \emph{not} the likelihood maximized over 
+$\theta$ (that would be the maximum likelihood, which always favors more 
+complex models). It is the likelihood \emph{averaged} over the prior. A model 
+with more parameters spreads its prior mass over a larger volume, diluting 
+the average. So the evidence automatically penalizes unnecessary complexity: 
+a simpler model that fits the data adequately will have higher evidence than 
+a complex model that fits slightly better but wastes prior mass on 
+parameter regions that the data don't support. This is the Bayesian Occam's 
+razor.
+\end{remark}
+
+\subsection{Computing the evidence: thermodynamic integration}
+\label{sec:TI}
+
+Standard MCMC produces samples from $\pi(\theta \mid \mathbf{y})$ but does 
+not compute the normalizing constant $Z$. \textbf{Thermodynamic integration} 
+(TI), also called \textbf{power posterior sampling}, is a method for estimating 
+$\log Z$ from a sequence of MCMC runs at different ``temperatures.''
+
+Define the \textbf{power posterior} at inverse temperature $\beta \in [0, 1]$:
+\begin{equation}\label{eq:power_posterior}
+\pi_\beta(\theta) := \frac{L(\mathbf{y} \mid \theta)^\beta\,\pi_0(\theta)}{Z(\beta)},
+\qquad Z(\beta) := \int L(\mathbf{y} \mid \theta)^\beta\,\pi_0(\theta)\,d\theta.
+\end{equation}
+At $\beta = 0$, $\pi_0(\theta) = \pi_0(\theta)$ (the prior) and $Z(0) = 1$ 
+(assuming the prior is normalized). At $\beta = 1$, 
+$\pi_1(\theta) = \pi(\theta \mid \mathbf{y})$ (the posterior) and $Z(1) = Z$ 
+(the evidence). The key identity is:
+
+\begin{proposition}[Thermodynamic identity]
+\begin{equation}\label{eq:TI_identity}
+\log Z = \int_0^1 \E_{\pi_\beta}\bigl[\log L(\mathbf{y} \mid \theta)\bigr]\,d\beta.
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+Differentiate $\log Z(\beta) = \log \int L^\beta \pi_0\,d\theta$ with respect 
+to $\beta$:
+\[
+\frac{d}{d\beta}\log Z(\beta) 
+= \frac{\int (\log L)\,L^\beta \pi_0\,d\theta}{\int L^\beta \pi_0\,d\theta}
+= \E_{\pi_\beta}[\log L].
+\]
+Integrate both sides from $\beta = 0$ to $\beta = 1$:
+\[
+\log Z(1) - \log Z(0) = \int_0^1 \E_{\pi_\beta}[\log L]\,d\beta.
+\]
+Since $Z(0) = 1$ (normalized prior), $\log Z(0) = 0$, giving~\eqref{eq:TI_identity}.
+\end{proof}
+
+\noindent\textbf{The algorithm:}
+\begin{enumerate}[label=\textbf{Step \arabic*.}]
+\item Choose a grid $0 = \beta_0 < \beta_1 < \cdots < \beta_B = 1$. A 
+  common choice is a geometric spacing $\beta_j = (j/B)^c$ with $c \approx 5$, 
+  which clusters points near $\beta = 0$ where the integrand changes most 
+  rapidly.
+\item For each $\beta_j$, run MCMC targeting $\pi_{\beta_j}(\theta)$ (the 
+  power posterior at temperature $\beta_j$). This is the same MCMC algorithm 
+  you already use, but with the log-likelihood multiplied by $\beta_j$.
+\item From the samples $\{\theta^{(k)}_j\}_{k=1}^K$ at temperature $\beta_j$, 
+  estimate
+  \[
+  I_j := \E_{\pi_{\beta_j}}[\log L] \approx \frac{1}{K}\sum_{k=1}^K 
+  \log L(\mathbf{y} \mid \theta^{(k)}_j).
+  \]
+\item Approximate the integral~\eqref{eq:TI_identity} by the trapezoidal rule:
+  \begin{equation}\label{eq:TI_numerical}
+  \log \hat{Z} = \sum_{j=0}^{B-1} \frac{\beta_{j+1} - \beta_j}{2}
+  (I_j + I_{j+1}).
+  \end{equation}
+\end{enumerate}
+
+\noindent\textbf{Cost:} $B$ MCMC runs (typically $B = 10$--$30$), each of 
+the same length as the original posterior run. The total cost is roughly 
+$B$ times the cost of a single inference.
+
+\begin{remark}[Variance and error control]
+The trapezoidal approximation~\eqref{eq:TI_numerical} has discretization 
+error $O((\Delta\beta)^2)$ (from the trapezoidal rule) plus Monte Carlo 
+error $O(K^{-1/2})$ at each temperature. The geometric spacing concentrates 
+grid points near $\beta = 0$, where the transition from prior to posterior 
+is sharpest. In practice, $B = 20$ with $K = 5000$ samples per rung is 
+usually sufficient.
+\end{remark}
+
+\subsection{Other methods for computing the evidence}
+
+\subsubsection{Bridge sampling}
+
+Given posterior samples $\{\theta_1^{(k)}\}$ and $\{\theta_2^{(k)}\}$ from 
+two models, bridge sampling estimates $Z_1/Z_2$ directly using an optimal 
+``bridge function.'' The estimator (Meng \& Wong, 1996) is:
+\begin{equation}\label{eq:bridge}
+\frac{\hat{Z}_1}{\hat{Z}_2} 
+= \frac{\sum_{k=1}^{K_2} h(\theta_2^{(k)})\,
+  L_1(\mathbf{y} \mid \theta_2^{(k)})\,\pi_{0,1}(\theta_2^{(k)})}
+{\sum_{k=1}^{K_1} h(\theta_1^{(k)})\,
+  L_2(\mathbf{y} \mid \theta_1^{(k)})\,\pi_{0,2}(\theta_1^{(k)})},
+\end{equation}
+where $h$ is the optimal bridge function 
+$h(\theta) \propto [K_1 \pi_1(\theta) + K_2 \pi_2(\theta)]^{-1}$. Since $h$ 
+depends on $Z_1/Z_2$ (through the posteriors), the estimator is applied 
+iteratively until convergence.
+
+Bridge sampling requires \textbf{overlap} between the two posteriors: the 
+samples from model~1 must have nontrivial density under model~2 and vice 
+versa. This works well for nested models (where one model is a special case 
+of the other) but can fail for very different models.
+
+\subsubsection{Nested sampling}
+
+Nested sampling (Skilling, 2006) transforms the $d$-dimensional evidence 
+integral into a one-dimensional integral over the prior mass. Define the 
+``prior volume'' $X(\lambda) = \Prb_{\pi_0}[L(\mathbf{y} \mid \theta) > \lambda]$. 
+Then $Z = \int_0^1 L^*(X)\,dX$ where $L^*(X)$ is the inverse of $X(\lambda)$. 
+The algorithm:
+\begin{enumerate}[label=(\alph*)]
+\item Maintain $N$ ``live points'' drawn from the prior, confined to the 
+  region where $L > \lambda_{\min}$.
+\item At each iteration, remove the point with the lowest likelihood, 
+  replace it with a new point drawn from $\pi_0$ subject to 
+  $L > \lambda_{\min}$, and increment $\lambda_{\min}$.
+\item The discarded points, weighted by the prior volume they represent, 
+  give an estimate of $Z$.
+\end{enumerate}
+Nested sampling is popular in cosmology (the \texttt{dynesty}, 
+\texttt{MultiNest}, and \texttt{UltraNest} packages). It works well for 
+moderate dimensions ($\lesssim 30$) but the constrained prior sampling 
+becomes expensive in high dimensions.
+
+\subsubsection{Savage--Dickey density ratio (for nested models)}
+\label{sec:savage_dickey}
+
+If $\cM_1$ is $\cM_2$ with a subset of parameters $\phi$ fixed at a 
+specific value $\phi_0$ (e.g., $\cM_1$: $\phi = 0$; $\cM_2$: $\phi$ free), 
+then the Bayes factor has a remarkably simple form:
+\begin{equation}\label{eq:savage_dickey}
+B_{12} = \frac{\pi(\phi = \phi_0 \mid \mathbf{y}, \cM_2)}{\pi_0(\phi = \phi_0 \mid \cM_2)}.
+\end{equation}
+That is: the ratio of the posterior density to the prior density at the 
+restricted value, both evaluated under the larger model $\cM_2$.
+
+\textbf{In words:} if the data pull the posterior away from $\phi_0$, the 
+numerator is small and $B_{12} < 1$ (the data favor the larger model). If 
+the posterior concentrates \emph{at} $\phi_0$, the numerator is large and 
+$B_{12} > 1$ (the simpler model suffices).
+
+\textbf{Cost:} Nearly free once you have posterior samples from $\cM_2$. 
+You just need a kernel density estimate of the marginal posterior of $\phi$ 
+evaluated at $\phi_0$. The practical challenge is getting a good density 
+estimate, especially if $\phi$ is high-dimensional.
+
+
+%% ===================================================================
+\section{Hierarchical Inference of Hyperparameters}\label{sec:hierarchical}
+%% ===================================================================
+
+\subsection{The idea}
+
+Instead of fixing model parameters (e.g., noise level $\sigma$, 
+physical constants $\alpha$) at their nominal values, treat them as 
+unknowns with (weakly informative) priors and infer them jointly with the 
+primary unknown $\theta$. The joint posterior is
+\begin{equation}\label{eq:hierarchical}
+\pi(\theta, \alpha \mid \mathbf{y}) \propto 
+L(\mathbf{y} \mid \theta, \alpha)\,\pi_0(\theta \mid \alpha)\,\pi_{\text{hyper}}(\alpha),
+\end{equation}
+where $\alpha$ collects the hyperparameters and $\pi_{\text{hyper}}(\alpha)$ 
+is a hyperprior (typically vague: wide Gaussian, inverse-gamma, etc.).
+
+\subsection{How this detects misspecification}
+
+\textbf{The key diagnostic:} if the marginal posterior 
+$\pi(\alpha \mid \mathbf{y})$ concentrates far from the nominal 
+(experimentally measured or physically expected) value $\alpha^*$, the model 
+is compensating for a structural deficiency by distorting $\alpha$.
+
+More precisely: let $\alpha^*$ be the ``correct'' value of the 
+hyperparameter (known from an independent measurement or physical theory). 
+Run MCMC on the joint model~\eqref{eq:hierarchical} and examine the 
+marginal posterior $\pi(\alpha \mid \mathbf{y})$.
+\begin{itemize}
+\item If $\alpha^* \in$ the 95\% credible interval of 
+  $\pi(\alpha \mid \mathbf{y})$: no tension. The model is consistent with the 
+  known value.
+\item If $\alpha^*$ is far in the tail of $\pi(\alpha \mid \mathbf{y})$: 
+  the data are forcing $\alpha$ away from its known value. The model needs 
+  $\alpha \neq \alpha^*$ to fit the data, which means something else in the 
+  model is wrong. This is a specific, interpretable diagnostic: the \emph{direction} 
+  in which $\alpha$ is pulled tells you what physics is missing.
+\end{itemize}
+
+\subsection{Advantages over model comparison}
+
+Hierarchical inference is a \emph{continuous} version of model comparison. 
+Rather than choosing between discrete models ($\cM_1$: fix $\alpha = \alpha^*$ 
+vs.\ $\cM_2$: infer $\alpha$), you let the data tell you \emph{how much} 
+$\alpha$ needs to deviate from $\alpha^*$. This is often more informative 
+than a binary Bayes factor, because:
+\begin{itemize}
+\item It gives a direction and magnitude of tension, not just a number.
+\item It does not require computing the evidence $Z$ (standard MCMC suffices).
+\item It naturally handles multiple hyperparameters simultaneously.
+\end{itemize}
+
+\subsection{MCMC implementation: Gibbs-within-Metropolis}\label{sec:gibbs}
+
+The joint posterior~\eqref{eq:hierarchical} has two qualitatively different 
+blocks of unknowns: the primary unknown $\theta$ (high- or 
+infinite-dimensional, e.g., a function $\delta(y)$) and the hyperparameters 
+$\alpha$ (low-dimensional, e.g., a handful of scalars). The natural sampling 
+strategy is a \textbf{Gibbs alternation} with specialized updates for each 
+block.
+
+\subsubsection{Block 1: Update $\theta \mid \alpha, \mathbf{y}$}
+
+Conditional on the current hyperparameter values $\alpha$, the full 
+conditional for $\theta$ is
+\begin{equation}\label{eq:full_cond_theta}
+\pi(\theta \mid \alpha, \mathbf{y}) \propto 
+L(\mathbf{y} \mid \theta, \alpha)\,\pi_0(\theta \mid \alpha).
+\end{equation}
+This is exactly the posterior of the original inverse problem, but with the 
+likelihood and prior evaluated at the current $\alpha$. For 
+infinite-dimensional $\theta$ (function-valued unknowns), this is where 
+\textbf{dimension-robust MCMC algorithms} are essential:
+\begin{itemize}
+\item \textbf{pCN} (preconditioned Crank--Nicolson): proposals of the form 
+  $\theta' = \sqrt{1 - \beta^2}\,\theta + \beta\,\xi$, $\xi \sim \pi_0$, 
+  which are reversible with respect to the prior and whose acceptance rate 
+  is independent of the discretization dimension.
+\item \textbf{$\infty$-HMC} (infinite-dimensional Hamiltonian Monte Carlo): 
+  Hamiltonian dynamics on the Cameron--Martin space of the prior, giving 
+  gradient-informed proposals that are also dimension-robust.
+\item \textbf{mpCN and MESS} (multiproposal variants): generate multiple 
+  proposals per step for improved parallel efficiency and mixing in 
+  multimodal posteriors.
+\end{itemize}
+These serve as the \textbf{Metropolis-within-Gibbs} step for the $\theta$ 
+block. The key observation is that conditioning on $\alpha$ does not change 
+the structure of this update at all --- it only changes the numerical 
+values plugged into the forward map $\cG(\theta; \alpha)$ and possibly the 
+prior covariance operator $\mathcal{C}(\alpha)$. Existing MCMC code for the 
+primary inference needs only to accept $\alpha$ as a parameter input rather 
+than a hardcoded constant.
+
+\subsubsection{Block 2: Update $\alpha \mid \theta, \mathbf{y}$}
+
+Conditional on the current $\theta$, the full conditional for $\alpha$ is 
+low-dimensional:
+\begin{equation}\label{eq:full_cond_alpha}
+\pi(\alpha \mid \theta, \mathbf{y}) \propto 
+L(\mathbf{y} \mid \theta, \alpha)\,\pi_0(\theta \mid \alpha)\,
+\pi_{\text{hyper}}(\alpha).
+\end{equation}
+Since $\alpha$ is typically 3--5 scalars, a simple Metropolis step (random 
+walk, or adaptive Metropolis, or MALA) suffices. In some cases, conjugacy 
+gives a direct Gibbs draw:
+
+\begin{example}[Noise variance $\sigma^2$]
+If $\Sigma = \sigma^2 I_d$ and $\sigma^2$ has an inverse-gamma prior 
+$\sigma^2 \sim \text{IG}(a_0, b_0)$, then the full 
+conditional~\eqref{eq:full_cond_alpha} is also inverse-gamma:
+\[
+\sigma^2 \mid \theta, \mathbf{y} \;\sim\; 
+\text{IG}\Bigl(a_0 + \tfrac{d}{2},\; 
+b_0 + \tfrac{1}{2}\|\mathbf{y} - \cG(\theta)\|^2\Bigr).
+\]
+This is a direct draw --- no Metropolis step needed, no forward model 
+evaluation required (the residual $\mathbf{y} - \cG(\theta)$ is already 
+available from Block~1).
+\end{example}
+
+\begin{example}[Physical parameters entering $\cG$ nonlinearly]
+For hyperparameters like $\Delta$, $E_z$, or $\alpha_R$ that enter the 
+forward map $\cG$ through the BdG Hamiltonian, there is no conjugacy. 
+The full conditional~\eqref{eq:full_cond_alpha} requires evaluating 
+$\cG(\theta; \alpha')$ at the proposed value $\alpha'$, which is a full 
+forward model solve. However, since this is a 1D (or at most 3--4D) 
+Metropolis update, even a simple random walk mixes quickly.
+\end{example}
+
+\subsubsection{The full Gibbs iteration}
+
+One iteration of the hierarchical sampler is:
+\begin{equation}\label{eq:gibbs_iteration}
+\boxed{
+\begin{aligned}
+&\text{1.}\quad \theta^{(k+1)} \sim \pi(\theta \mid \alpha^{(k)}, \mathbf{y})
+  &&\text{(pCN/mpCN/MESS --- one or several steps)}, \\
+&\text{2.}\quad \alpha^{(k+1)} \sim \pi(\alpha \mid \theta^{(k+1)}, \mathbf{y})
+  &&\text{(Metropolis or Gibbs for each component)}.
+\end{aligned}
+}
+\end{equation}
+
+\subsubsection{Cost analysis}
+
+\textbf{Block~1} requires at least one evaluation of 
+$\cG(\theta; \alpha^{(k)})$ per step (this is the dominant cost and is 
+the same as in the non-hierarchical sampler).
+
+\textbf{Block~2} cost depends on where $\alpha$ enters:
+\begin{itemize}
+\item If $\alpha$ enters \emph{only through the likelihood} and not 
+  through $\cG$ (e.g., the noise variance $\sigma^2$ scales the 
+  residual), then Block~2 is essentially \textbf{free}: no forward model 
+  evaluation is needed, just a re-evaluation of the likelihood at the 
+  current residual with the new $\alpha$.
+\item If $\alpha$ enters \emph{through the Hamiltonian} (e.g., $\Delta$, 
+  $E_z$, $\alpha_R$), then accepting a proposed $\alpha'$ in Block~2 
+  requires a full forward model evaluation $\cG(\theta^{(k+1)}; \alpha')$. 
+  This is one additional solve per accepted $\alpha$-proposal.
+\end{itemize}
+
+\textbf{Practical trick:} perform several $\theta$-updates (Block~1 
+steps) per $\alpha$-update (Block~2 step). The $\theta$-updates are 
+already paying for forward model evaluations, and the hyperparameters 
+$\alpha$ typically mix faster (being low-dimensional) so they do not 
+need to be updated at every iteration. A ratio of 5--10 $\theta$-steps 
+per $\alpha$-step is a reasonable starting point.
+
+\textbf{Total overhead} relative to the non-hierarchical sampler: if 
+$\alpha$ only includes the noise variance (conjugate update), the 
+overhead is negligible. If $\alpha$ includes physical parameters entering 
+$\cG$, the overhead is roughly the fraction of Block~2 proposals that are 
+accepted times one additional forward solve per acceptance --- typically 
+a 10--30\% increase in total cost.
+
+
+%% ===================================================================
+\section{Residual Analysis}\label{sec:residuals}
+%% ===================================================================
+
+\subsection{The Bayesian residual}
+
+Given a point estimate $\hat\theta$ (e.g., the posterior mean 
+$\hat\theta = \E_\pi[\theta]$ or the MAP estimate 
+$\hat\theta = \arg\max_\theta \pi(\theta \mid \mathbf{y})$), define the 
+\textbf{residual vector}
+\begin{equation}\label{eq:residual}
+\mathbf{r}(\hat\theta) := \mathbf{y} - \cG(\hat\theta) \in \R^d.
+\end{equation}
+Under the model~\eqref{eq:measurement}, if $\hat\theta$ were exactly equal 
+to the true parameter $\theta^*$, then 
+$\mathbf{r}(\theta^*) = \eta \sim N(0, \Sigma)$.
+
+\subsection{What to check}
+
+Standard regression diagnostics apply:
+\begin{enumerate}[label=(\alph*)]
+\item \textbf{Normality.} Are the standardized residuals 
+  $\tilde{r}_i = [\Sigma^{-1/2}\mathbf{r}]_i$ approximately $N(0, 1)$? 
+  Check with a QQ-plot or a Shapiro--Wilk test. Departures suggest 
+  non-Gaussian noise or model misspecification.
+\item \textbf{Homoscedasticity.} Plot $|\tilde{r}_i|$ against the 
+  predicted values $[\cG(\hat\theta)]_i$ or against an experimental 
+  variable (e.g., bias voltage $V$). Patterns (e.g., larger residuals 
+  at certain voltages) indicate that the noise model $\Sigma$ is wrong 
+  or that the forward map $\cG$ systematically misses features at those 
+  parameter values.
+\item \textbf{Independence.} If the data have a natural ordering (e.g., 
+  indexed by voltage), check for autocorrelation in the residuals. 
+  Positive autocorrelation suggests the model is missing smooth structure 
+  in the data.
+\item \textbf{Omnibus chi-squared.} Under the model, 
+  $\chi^2 := \|\Sigma^{-1/2}\mathbf{r}\|^2 \sim \chi^2_d$ 
+  (approximately, for $\hat\theta$ close to $\theta^*$). If 
+  $\chi^2 \gg d$, the model does not fit the data.
+\end{enumerate}
+
+\subsection{When residual analysis is and is not rigorous}
+
+\textbf{The honest statement:} the distributional claim 
+$\mathbf{r}(\hat\theta) \sim N(0, \Sigma)$ is only valid if:
+\begin{enumerate}[label=(\roman*)]
+\item The model is correctly specified (the true DGP is~\eqref{eq:measurement} 
+  with $\eta \sim N(0, \Sigma)$).
+\item The estimator $\hat\theta$ is close to the true $\theta^*$ (i.e., the 
+  posterior has concentrated near the truth --- the Bayesian consistency 
+  condition).
+\end{enumerate}
+If the posterior has not concentrated --- for example because the data are 
+insufficient to identify $\theta^*$, or because the parameter space is 
+too high-dimensional --- then $\hat\theta$ may be far from $\theta^*$ and 
+the residuals $\mathbf{r}(\hat\theta)$ will reflect both the noise $\eta$ 
+and the estimation error $\cG(\theta^*) - \cG(\hat\theta)$. In this case 
+the residuals are not guaranteed to be Gaussian even if the model is correct.
+
+\textbf{The practical value:} despite the lack of formal guarantees, residual 
+analysis remains the fastest and most intuitive diagnostic. The logic is 
+asymmetric:
+\begin{itemize}
+\item If the residuals look terrible (structured patterns, heavy tails, 
+  heteroscedasticity), the model is almost certainly wrong.
+\item If the residuals look clean, the model \emph{might} be right --- but 
+  a wrong model can produce innocent-looking residuals if the misspecification 
+  lies in a direction the data cannot probe.
+\end{itemize}
+This is the same situation as in classical regression: residual analysis 
+catches many forms of misspecification but is not omniscient.
+
+\begin{remark}[Connection to posterior predictive checks]
+The chi-squared residual $\chi^2 = \|\Sigma^{-1/2}\mathbf{r}(\hat\theta)\|^2$ 
+at the point estimate is closely related to the omnibus posterior predictive 
+check with $T = T_{\chi^2}$ from~\eqref{eq:T_chi2}. The difference is that 
+the posterior predictive check averages over posterior uncertainty in $\theta$, 
+while the residual check conditions on a single point estimate. The posterior 
+predictive version is more Bayesian but more expensive; the residual version 
+is quick and dirty but can be sharpened by examining the residuals at 
+\emph{multiple} posterior samples rather than just the point estimate.
+\end{remark}
+
+
+%% ===================================================================
+\section{Recommendations for the Majorana Nanowire Problem}\label{sec:recs}
+%% ===================================================================
+
+\subsection{Recall of the problem setup}
+
+We observe a conductance map 
+$\mathbf{G} = \{G_{LL}^i, G_{LR}^i, G_{RL}^i, G_{RR}^i\}_{i=1}^n$ from 
+a proximitized semiconductor nanowire, where the data are modeled as
+\begin{equation}\label{eq:our_model}
+\mathbf{G} = \cG(\delta^*) + \eta, \qquad \eta \sim N(0, \Sigma),
+\end{equation}
+with $\delta^*: [0, L] \to \R$ the true disorder profile and $\cG$ the 
+forward map:
+\[
+\cG: \delta(\cdot) 
+\;\xrightarrow{H_{\mathrm{BdG}}(\delta)}\; 
+\;\xrightarrow{S(E;\delta)}\;
+\;\xrightarrow{\text{Landauer--B\"uttiker}}\;
+\mathbf{G}(\delta).
+\]
+The BdG Hamiltonian is 
+$H_{\mathrm{BdG}} = \tau_z[-\frac{\hbar^2}{2m^*}\partial_y^2\sigma_0 
+- \mu(y)\sigma_0 - i\hbar\alpha_R\sigma_x\partial_y + V_g(y)\sigma_0] 
+- E_z\tau_0\sigma_z + \Delta\tau_x\sigma_0$,
+where $\mu(y) = \mu_0 + \delta(y)$ and the known parameters are 
+$m^*, \alpha_R, \Delta, E_z, V_g, \mu_0$. The posterior is
+\[
+\pi(\delta \mid \mathbf{G}) \propto 
+\exp\bigl(-\tfrac{1}{2}\|\Sigma^{-1/2}(\mathbf{G} - \cG(\delta))\|^2\bigr)
+\,\pi_0(\delta).
+\]
+
+\subsection{Specific model validation recommendations}
+
+\subsubsection{Posterior predictive checks}
+
+Generate replicated conductance maps 
+$\mathbf{G}^{(k)} = \cG(\delta^{(k)}) + \eta^{(k)}$ from posterior 
+samples. Recommended summary statistics:
+\begin{enumerate}[label=(\roman*)]
+\item \textbf{Omnibus fit:} 
+  $T_1 = \|\Sigma^{-1/2}(\mathbf{G} - \cG(\delta))\|^2$ 
+  (chi-squared at each posterior sample).
+\item \textbf{Left--right asymmetry:} 
+  $T_2 = \|G_{LL}(V=0) - G_{RR}(V=0)\|$. A true MZM pair produces 
+  quantized ZBCPs at both ends; if the model is correct, the posterior 
+  predictive distribution of $T_2$ should be consistent with the observed 
+  asymmetry.
+\item \textbf{Nonlocal conductance magnitude:} 
+  $T_3 = \max_V |G_{RL}(V)|$. This probes whether the model captures 
+  bulk transport correctly.
+\item \textbf{ZBCP width:} 
+  $T_4 = $ full width at half maximum of $G_{LL}(V)$ near $V = 0$. 
+  Sensitive to temperature broadening and tunnel barrier modeling.
+\end{enumerate}
+\textbf{Cost:} essentially free once the MCMC run is complete, since 
+$\cG(\delta^{(k)})$ has already been evaluated during sampling.
+
+\subsubsection{Bayesian model comparison}
+
+The most natural model comparisons for this problem:
+
+\medskip
+\noindent\textbf{(A) Disorder only vs.\ disorder $+$ unknown gate potential.}
+\begin{itemize}
+\item $\cM_1$: Infer $\delta(y)$ with $V_g(y) = V_g^{\text{nominal}}(y)$ 
+  fixed at the experimentally specified gate profile.
+\item $\cM_2$: Infer both $\delta(y)$ and $V_g(y)$ jointly.
+\end{itemize}
+If $\cM_2$ has decisively higher evidence, the nominal gate profile is 
+inadequate and the conductance data contain information about gate 
+potential variations that the disorder alone cannot explain.
+
+\medskip
+\noindent\textbf{(B) Single-band vs.\ multi-band BdG.}
+\begin{itemize}
+\item $\cM_1$: The current single-band model.
+\item $\cM_2$: A multi-band extension with additional sub-bands in the 
+  nanowire.
+\end{itemize}
+More expensive to implement but directly tests the most significant 
+physical simplification in the model.
+
+\medskip
+\noindent\textbf{Recommended method:} Thermodynamic integration 
+(\S\ref{sec:TI}), since MCMC infrastructure is already in place. For the 
+parametric ($\sim 3$ parameter) version of the problem, nested sampling 
+(via \texttt{dynesty}) is also practical and gives the evidence as a 
+direct output.
+
+\subsubsection{Hierarchical inference}
+
+Promote the following nominal parameters to inferred quantities with 
+weakly informative priors centered at their experimental values:
+\begin{enumerate}[label=(\roman*)]
+\item \textbf{Superconducting gap $\Delta$:} if the posterior on $\Delta$ 
+  is pulled away from the experimentally measured value, this indicates 
+  that the proximity effect is not spatially uniform or that the 
+  effective gap differs from the bulk value. One could then extend the 
+  model to infer a spatially varying $\Delta(y)$.
+\item \textbf{Zeeman energy $E_z$:} should be well-determined by the 
+  applied magnetic field, but if the effective $g$-factor varies along 
+  the wire, the posterior on $E_z$ will be pulled.
+\item \textbf{Noise variance $\sigma^2$} (or the full $\Sigma$): if the 
+  posterior on $\sigma^2$ is much larger than the experimentally estimated 
+  noise, the model is under-fitting the data (the extra variance 
+  compensates for systematic model error).
+\item \textbf{Spin-orbit coupling $\alpha_R$:} should be determined by 
+  the material, but effective values can differ from bulk measurements 
+  in confined geometries.
+\end{enumerate}
+
+\textbf{Cost:} Modest --- enlarges the parameter space by a few dimensions 
+(one per hyperparameter). The MCMC mixing may slow down slightly but the 
+per-sample cost of $\cG$ is unchanged.
+
+\subsubsection{Residual analysis}
+
+At the posterior mean $\hat\delta = \E_\pi[\delta]$, compute the 
+standardized residuals 
+$\tilde{r}_i = [\Sigma^{-1/2}(\mathbf{G} - \cG(\hat\delta))]_i$ and 
+check:
+\begin{enumerate}[label=(\roman*)]
+\item \textbf{QQ-plot} of $\{\tilde{r}_i\}$ against $N(0,1)$ quantiles.
+\item \textbf{Residuals vs.\ bias voltage $V$:} plot $\tilde{r}_i$ 
+  against $V_i$. Systematic structure (e.g., residuals consistently 
+  positive near $V = 0$ or at the gap edge $eV \approx \Delta$) 
+  indicates the model misses features at specific energies.
+\item \textbf{Residuals vs.\ Zeeman field $V_Z$:} plot $\tilde{r}_i$ 
+  against $V_{Z,j}$. Structure near the topological phase transition 
+  ($V_Z \approx \sqrt{\mu_0^2 + \Delta^2}$) would indicate the model 
+  struggles precisely where the physics is most interesting.
+\item \textbf{Residuals by component:} compare the residual distributions 
+  for $G_{LL}$, $G_{LR}$, $G_{RL}$, $G_{RR}$ separately. If one 
+  component has systematically larger residuals, the model may be 
+  misspecifying the physics at one end of the wire or in the bulk.
+\item \textbf{Chi-squared test:} 
+  $\chi^2 = \sum_i \tilde{r}_i^2 \approx \chi^2_d$. Report $\chi^2/d$ 
+  (should be $\approx 1$).
+\end{enumerate}
+
+\textbf{Cost:} Negligible (one forward model evaluation at the posterior mean).
+
+\subsection{Recommended workflow}
+
+In order of increasing effort:
+\begin{enumerate}[label=\textbf{\arabic*.}]
+\item \textbf{Residual analysis} (free, do always): inspect the 
+  residuals at the posterior mean for structure. Takes minutes.
+\item \textbf{Posterior predictive checks} (cheap, do always): 
+  generate $K$ replicated datasets from the posterior, check 3--5 
+  summary statistics. Requires no additional forward model evaluations 
+  beyond what MCMC already computed.
+\item \textbf{Hierarchical inference} (moderate cost, do for key 
+  parameters): promote $\Delta$, $\sigma^2$, and possibly $E_z$ and 
+  $\alpha_R$ to inferred quantities. Run one additional MCMC chain with 
+  the expanded parameter space. Examine the marginal posteriors for 
+  tension with known values.
+\item \textbf{Bayesian model comparison} (expensive, do for key 
+  model choices): compute the evidence via thermodynamic integration 
+  for the disorder-only model vs.\ the disorder-plus-gate-potential 
+  model. Requires $\sim 20$ additional MCMC runs.
+\end{enumerate}
+
+
+\end{document}
