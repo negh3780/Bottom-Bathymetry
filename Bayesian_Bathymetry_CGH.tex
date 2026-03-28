@@ -30,6 +30,7 @@
 \usepackage{enumerate}
 \usepackage[]{mdframed} \usepackage{cjhebrew}
 \usepackage[capitalize,nameinlink,noabbrev]{cleveref}
+\usepackage{enumitem}
 
 \providecommand*\showkeyslabelformat[1]{{\normalfont \tiny#1}}
 \usepackage[notref,notcite,color]{showkeys}
@@ -237,8 +238,9 @@ We will follow \cite{PancottoClark2025} as our starting point where they\footnot
 \section{Formulating the (Gaussian) Prior}
 \label{sec:prior}
 
-In order to set down the details for how we can specify $\mu_0$ \eqref{eq:gaussian:prior} and then numerically draw from $\mu_0$
-as will be needed in \eqref{sec:MCMC} let us briefly review for the formal d
+In order to set down the details for how we can specify $\mu_0$ \eqref{eq:gaussian:prior} and then to numerically draw from $\mu_0$
+as will be needed in \eqref{sec:MCMC} let us briefly review for the formal mathematical definitions associate to \eqref{eq:gaussian:prior}.
+Let $\mathcal{H}$.
 
 
 \section{Numerically Resolving the Posterior}
@@ -256,6 +258,14 @@ as will be needed in \eqref{sec:MCMC} let us briefly review for the formal d
 \subsection{Sensitivity Analysis}
 
 \section{Toward a mathematically rigorous formulation}
+
+\section{Open Questions to Address}
+
+\begin{enumerate}[label=(\alph*)]
+\item In the periodic setting where the domain is $[-L,L]$ (or $[-L,L]^2$) if $0< \ell \ll L$ and all our observations 
+are in $[-\ell, \ell]$ do we get a good resolution of $b$ in subregion?  Less precisely but maybe more to the point
+we are trying to make here can we do local Bathymetry even if we get the boundary conditions wrong in the 'far field'.
+\end{enumerate}
 
 \newpage
 \section*{Acknowledgements}
