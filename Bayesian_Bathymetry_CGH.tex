@@ -68,8 +68,18 @@
 \newcommand{\bfY}{\mathbf{Y}}
 \newcommand{\cC}{\mathcal{C}}
 
+
+\newcommand{\cH}{\mathcal{H}}
+\newcommand{\la}{\langle}
+\newcommand{\ra}{\rangle}
+
+
 \newcommand{\bfx}{\mathbf{x}}
 \newcommand{\tbfx}{\tilde{\mathbf{x}}}
+\newcommand{\bfm}{\mathbf{m}}
+\newcommand{\bfu}{\mathbf{u}}
+\newcommand{\bfv}{\mathbf{v}}
+\newcommand{\bfe}{\mathbf{e}}
 
 
 %%%%%%
@@ -154,7 +164,7 @@ operators.  These $\Obs_j$ could be spatial temporal averages of $\eta$.  Of cou
 Suppose that  
 \begin{align}
 \label{eq:gaussian:obs}
-	\beps \sim N(0, \Sigma), 
+	\beps \sim \mathcal{N}(0, \Sigma), 
 \end{align}
 namely $\beps$ is a Gaussian mean free error, with Covariance $\Sigma$.  Note that this $\Sigma$ includes the possibility of correlations in the observation noise.  
 In this situation we then have a  likelihood of $b$ of the form
@@ -184,7 +194,7 @@ traceability of our monte carlo scheme to resolve \eqref{eq:bayes:bath} and for 
 we will consider 
 \begin{align}
 \label{eq:gaussian:prior}
-	\mu_0 = N(b_m, \cC) \quad \text{ so that formally } 
+	\mu_0 = \mathcal{N}(b_m, \cC) \quad \text{ so that formally } 
 	\mu_0(d b) \propto \exp( - \frac{1}{2} \| \cC^{-1/2} (b_m - b)\|^2) d b.
 \end{align}
 Here $b_m$ is our mean prior Bathymetry profile.  Regarding the covariance $\cC$ we may 
@@ -239,10 +249,43 @@ We will follow \cite{PancottoClark2025} as our starting point where they\footnot
 \label{sec:prior}
 
 In order to set down the details for how we can specify $\mu_0$ \eqref{eq:gaussian:prior} and then to numerically draw from $\mu_0$
-as will be needed in \eqref{sec:MCMC} let us briefly review for the formal mathematical definitions associate to \eqref{eq:gaussian:prior}.
-Let $\mathcal{H}$.
+as will be needed in \eqref{sec:MCMC} let us briefly review for the formal mathematical definitions associate to \eqref{eq:gaussian:prior};
+see e.g. \cite{Hairer2009, DaPratoZabczyk2014} and also \cite[Appendix A.3]{DashtiStuart2017} for a user friendly summary.
+Let $\cH$ be a separable Hilbert space with the associated inner product $\la \cdot, \cdot \ra$ and its Borel sets denoted as $\mathcal{B}(\cH)$.  A probability measure $\mu_0$ on $\mathcal{B}(\cH)$
+is Gaussian if the push-forward under $\ell$,  $\ell^* \mu_0$ is Gaussian for any bounded linear functional $\ell: \cH \to \RR$.  For any such measure
+there is element $\bfm \in \cH$, \emph{the mean}, and a bounded, symmetric, positive trace class operator $\cC$, \emph{the covariance} such that
+\begin{align}
+	\int \la \bfx, \bfu \ra \mu_0( d \bfx) =  \la \bfu, \bfm \ra, \qquad
+	\int \la \bfx - \bfm, \bfu \ra \la \bfx - \bfm, \bfv \ra  \mu_0( d \bfx) = \la \cC \bfu, \bfv \ra.
+\end{align}
+Notably this is just the usual definition of a multivariate Guassian in finite dimensions when $\cH$ is finite dimensional.
 
+Given an such mean and covariance $\bfm$ and $\cC$ we can find a complex orthonormal basis $\{\bfe_k\}_{k \geq 1}$ of
+eigenfunctions of $\cC$ so that
+\begin{align}
+	\cC \bfe_k = \lambda_k  \bfe_k
+\end{align}
+where $\lambda_k > 0$ is the associated eigenvalue and indeed 
+$\mbox{Tr}(\cC) = \sum_{k =1}^\infty \la \cC \bfe_k, \bfe_k \ra =  \sum_{k =1}^\infty \lambda_k$.  Then if we draw
+$\xi_j \sim N(0,1)$ i.i.d. for $j\geq 1$, it is not hard to verify that
+\begin{align}
+	\label{eq:KL:expansion}
+	\mbox{Law}\left( \bfm + \sum_{k =1}^\infty \sqrt{\lambda_k} \bfe_k \xi_k\right) = \mathcal{N}(\bfm, \cC).
+\end{align}
+This is called the Karhunen–Lo\'eve expansion and it provides means of drawing from $\mathcal{N}(\bfm, \cC)$
+which we may make use of.  
 
+In fact we will consider two approaches to designing concrete Gaussian priors for our modeling purposes herein.
+\begin{itemize}
+\item[(i)] Sobolev regularization where $\cC = (- \Delta)^{-\alpha}$ for $\alpha > d/2$ where $\Delta$ is the Laplacian on $[0,L]^d$ (with periodic boundary conditions).
+\item[(ii)] Two point correlation functions as in \eqref{eq:2pt:cov:def}--\eqref{eq:cov:from:2pt}.
+\end{itemize}
+
+\subsection{Sobolev regularization}
+
+\subsection{More complex covariance structures}
+According to Mercer's theorem so long as $K$ in \eqref{eq:2pt:cov:def} is symmetric, positive continuous and $\int_D K(x,x) dx < \infty$ then $\cC$ defined by 
+\eqref{eq:cov:from:2pt} is trace class.
 \section{Numerically Resolving the Posterior}
 \label{sec:MCMC}
 
